@@ -119,3 +119,18 @@ def test_symreg_config_save_serializes_classes_as_strings(tmp_path):
     assert loaded["net"]["net_cls"] == "<callable: sraz.instances.symreg.network.SymRegPolicyValueNet>"
     assert loaded["agent"]["mcts_params"]["n_simulations"] == 25
     assert loaded["trainer"]["n_procs"] == -1
+
+
+def test_build_selects_problem_grammar_and_target(tmp_path):
+    torch.manual_seed(0)
+    cfg = SymRegConfig(problem="additive_quadratic")
+    cfg.trainer.checkpoint_dir = str(tmp_path / "ckpt")
+    assert cfg.problem == "additive_quadratic"
+    game, net, _, _ = cfg.build()
+    # additive grammar: 4 productions, net auto-sized to match, no sine target
+    assert game.grammar.nprods == 4
+    assert net.n_actions == game.state_len * 4 == int(game.action_space.n)
+    assert net.n_tokens == game.grammar.nsym + 1
+    assert "sin" not in game.target_infix
+    # the default config is still the sine instance (unchanged)
+    assert SymRegConfig().problem == "sine"

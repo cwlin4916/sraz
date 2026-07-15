@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sraz.instances.symreg.game import SymRegGame
 from sraz.instances.symreg.network import SymRegPolicyValueNet
+from sraz.instances.symreg.problems import get_problem
 from sraz.core.agent import Agent
 from sraz.training.trainer import Trainer
 
@@ -22,8 +23,13 @@ from sraz.core.config import (
 class SymRegConfig(MetaConfig):
     """Configuration for symbolic-regression AlphaZero training."""
 
-    def __init__(self):
+    def __init__(self, problem: str = "sine"):
         super().__init__()
+        # Which named instance to build (see instances/symreg/problems.py). The
+        # grammar + target are injected in build(); the config's game.kwargs
+        # stays limited to max_len/redraw/problem_seed so the shipped default is
+        # unchanged.
+        self.problem = problem
         self.game = GameConfig(
             game_cls=SymRegGame,
             kwargs={
@@ -67,7 +73,10 @@ class SymRegConfig(MetaConfig):
 
     def build(self):
         """Build symreg game, network, agent, and trainer (no evaluator in v1)."""
-        game = SymRegGame(**self.game.kwargs)
+        prob = get_problem(self.problem)
+        # prob.game_kwargs() supplies (grammar, target); self.game.kwargs supplies
+        # max_len/redraw/problem_seed. No key overlap, so the merge is clean.
+        game = SymRegGame(**{**prob.game_kwargs(), **self.game.kwargs})
         net_kwargs = {
             "state_len": game.state_len,
             "n_tokens": game.grammar.nsym + 1,

@@ -27,7 +27,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from sraz.instances.symreg.config import SymRegConfig
-from sraz.instances.symreg.game import prefix_to_infix, TARGET_INFIX
+from sraz.instances.symreg.game import prefix_to_infix
 
 
 def _save_final_checkpoint(ckpt_path: Path, trainer, agent, net):
@@ -82,7 +82,7 @@ def setup_experiment_dir(cfg, seed: int, out_root: Path | None = None) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     n_sims = cfg.agent.mcts_params["n_simulations"]
     n_iters = cfg.run.n_iterations
-    dirname = f"{timestamp}_seed{seed}_mcts{n_sims}_iter{n_iters}"
+    dirname = f"{timestamp}_{cfg.problem}_seed{seed}_mcts{n_sims}_iter{n_iters}"
     root = Path(out_root) if out_root is not None else Path("experiments") / "symreg"
     exp_dir = root / dirname
     exp_dir.mkdir(parents=True, exist_ok=True)
@@ -124,7 +124,7 @@ def run_single_seed(cfg, exp_dir: Path):
     n_sims = cfg.agent.mcts_params["n_simulations"]
     print(f"\n{'='*78}")
     print(f"  Symbolic regression -- AlphaZero on the derivation grammar game")
-    print(f"  target: {TARGET_INFIX}  constants: "
+    print(f"  target: {game.target_infix}  constants: "
           + str({k: round(v, 3) for k, v in game.constants.items()}))
     print(f"  n_simulations={n_sims}  n_iterations={n_iters}  "
           f"n_games_per_train={cfg.trainer.n_games_per_train}")
@@ -203,6 +203,9 @@ def run_single_seed(cfg, exp_dir: Path):
 def parse_args():
     p = argparse.ArgumentParser(description="Symbolic regression -- AlphaZero")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--problem", type=str, default="sine",
+                   help="Named SR instance (default: sine; e.g. additive_quadratic). "
+                        "See src/sraz/instances/symreg/problems.py")
     p.add_argument("--n-iterations", type=int, default=None,
                    help="Override config default (10)")
     p.add_argument("--n-simulations", type=int, default=None,
@@ -222,7 +225,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parse_args()
 
-    cfg = SymRegConfig()
+    cfg = SymRegConfig(problem=args.problem)
     if args.n_iterations is not None:
         cfg.run.n_iterations = args.n_iterations
     if args.n_simulations is not None:
