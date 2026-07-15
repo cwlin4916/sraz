@@ -1,0 +1,9 @@
+# torch is installed separately (CPU wheel is fine):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# scipy arrives transitively via lmfit.
+numpy
+gymnasium>=1.0
+matplotlib>=3.8
+lmfit>=1.3
+sympy>=1.12
+pytest>=8.0
