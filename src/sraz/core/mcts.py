@@ -58,7 +58,9 @@ class MCTS():
                  # -- Backup strategy --
                  backup_rule: str = "mean",
                  backup_topk: int = 3,
-                 backup_tau: float = 0.1):
+                 backup_tau: float = 0.1,
+                 # -- Randomness --
+                 rng: "np.random.Generator | None" = None):
         assert backup_rule in ("mean", "max", "topk", "softmax"), \
             f"Unknown backup_rule: {backup_rule}"
 
@@ -83,6 +85,15 @@ class MCTS():
         self.backup_rule = backup_rule
         self.backup_topk = backup_topk
         self.backup_tau = backup_tau
+
+        # Source of MCTS exploration randomness (Dirichlet root noise and
+        # random rollouts). Injected so callers can tie it to a seeded stream
+        # (e.g. the Agent's per-episode RNG). A bare default_rng() keeps the
+        # object self-contained and, crucially, never touches the process-global
+        # np.random -- which the driver does not seed and which fork-based
+        # multiprocessing workers would otherwise share (drawing identical
+        # noise across self-play games). See docs/notes and Claude-reviews.
+        self.rng = rng if rng is not None else np.random.default_rng()
 
         # min max Q value
         self.q_min = float('inf')
@@ -129,7 +140,7 @@ class MCTS():
             # Add Dirichlet Noise (only if requested and node is fresh)
             if add_noise and mynode.total_N == 0:
                 if msg: print(msg, f"Adding Dirichlet Noise (alpha={self.dirichlet_alpha}, eps={self.dirichlet_epsilon})")
-                noise = np.random.dirichlet([self.dirichlet_alpha] * len(mynode.nn_policy))
+                noise = self.rng.dirichlet([self.dirichlet_alpha] * mynode.nn_policy.size).reshape(mynode.nn_policy.shape)
                 
                 # Apply noise only to valid moves to preserve the mask
                 # Optimization: if using masked policy, we should mix noise properly.
@@ -247,7 +258,7 @@ class MCTS():
                 if msg: print(msg, f"Adding Dirichlet Noise (tree reuse, alpha={self.dirichlet_alpha}, eps={self.dirichlet_epsilon})")
                 # Restore clean policy before mixing noise (prevents noise-on-noise)
                 mynode.nn_policy = mynode.nn_policy_original.copy()
-                noise = np.random.dirichlet([self.dirichlet_alpha] * len(mynode.nn_policy))
+                noise = self.rng.dirichlet([self.dirichlet_alpha] * mynode.nn_policy.size).reshape(mynode.nn_policy.shape)
 
                 mask = mynode.action_mask
                 masked_noise = noise * mask
@@ -311,7 +322,7 @@ class MCTS():
                 valid = np.flatnonzero(mask)
                 if len(valid) == 0:
                     break  # dead end
-                action = valid[np.random.randint(len(valid))]
+                action = valid[self.rng.integers(len(valid))]
                 if len(rollout_game.action_space.shape) == 0:
                     rollout_game.step_wrapper(int(action))
                 else:

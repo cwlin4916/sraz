@@ -174,18 +174,16 @@ def test_policy_temperature_zero_yields_non_finite_probs(agent, game):
     assert np.isnan(probs).any()
 
 
-def test_policy_add_noise_true_perturbs_and_is_globally_seeded(agent, game):
-    """The self-play default add_noise=True injects Dirichlet noise at the
-    MCTS root via the GLOBAL numpy RNG: with the global seed fixed the result
-    is reproducible, still a valid distribution, and (at seed 3, verified at
-    authoring time) has visit counts differing from the noiseless search."""
-    np.random.seed(0)
+def test_policy_add_noise_true_perturbs_and_is_reproducible_via_injected_rng(agent, game):
+    """The self-play default add_noise=True injects Dirichlet noise at the MCTS
+    root. That randomness is drawn from the injected ``rng`` (NOT the process-
+    global ``np.random``), so passing a freshly seeded Generator makes the
+    result reproducible, still a valid distribution, and (at seed 3) with visit
+    counts differing from the noiseless search."""
     probs_clean = agent.policy(game, add_noise=False)
 
-    np.random.seed(3)
-    probs_noisy = agent.policy(game, add_noise=True)
-    np.random.seed(3)
-    probs_noisy_again = agent.policy(game, add_noise=True)
+    probs_noisy = agent.policy(game, add_noise=True, rng=np.random.default_rng(3))
+    probs_noisy_again = agent.policy(game, add_noise=True, rng=np.random.default_rng(3))
 
     assert probs_noisy.shape == (2,)
     assert np.all(np.isfinite(probs_noisy)) and np.all(probs_noisy >= 0)
@@ -500,3 +498,59 @@ def test_extract_leaf_eval_data(game):
     game3 = ChainGame(length=3)
     game3.leaf_evaluator = object()
     assert Agent._extract_leaf_eval_data(game3) is None
+
+
+# ---------------------------------------------------------------------------
+# Regression: leaf-eval caches are extracted from the game actually stepped
+# (fix #2). Previously play_for_experience read an unstepped outer clone, so
+# export_caches() was always empty and Trainer's cross-worker merge was a no-op.
+# ---------------------------------------------------------------------------
+
+
+class _RecordingLeafEval:
+    """Minimal leaf_evaluator that records a key on every game step."""
+
+    def __init__(self):
+        self.seen = []
+
+    def record(self, key):
+        self.seen.append(key)
+
+    def export_caches(self):
+        return {"seen": list(self.seen)}
+
+
+class LeafEvalChainGame(ChainGame):
+    """ChainGame whose leaf_evaluator records (t, action) on each real step."""
+
+    def __init__(self, length=3):
+        super().__init__(length)
+        self.leaf_evaluator = _RecordingLeafEval()
+
+    def step(self, action):
+        out = super().step(action)
+        self.leaf_evaluator.record((int(self.t), int(action)))
+        return out
+
+
+def test_play_for_experience_extracts_leaf_eval_from_stepped_game():
+    game = LeafEvalChainGame(length=3)
+    agent = Agent(game, UniformNet(2), mcts_params=dict(MCTS_PARAMS))
+    *_, leaf_data = agent.play_for_experience(
+        game, id=0, reset_seed=0, interaction_seed=0, add_noise=False)
+    assert leaf_data is not None
+    # Exactly one record per real step of the 3-step episode. The MCTS-internal
+    # clones (created inside policy()) accumulate their own caches and are
+    # discarded, so they must NOT be the source of the export.
+    assert len(leaf_data["seen"]) == 3
+
+
+def test_play_for_experience_reuse_tree_extracts_leaf_eval():
+    game = LeafEvalChainGame(length=3)
+    agent = Agent(game, UniformNet(2), mcts_params=dict(MCTS_PARAMS))
+    *_, leaf_data = agent.play_for_experience_reuse_tree(
+        game, id=0, reset_seed=0, interaction_seed=0, add_noise=False)
+    assert leaf_data is not None
+    # Non-empty: the reuse-tree MCTS steps this game in place via advance_to,
+    # so its real-trajectory caches survive (pre-fix this was always empty).
+    assert len(leaf_data["seen"]) >= 1

@@ -41,7 +41,7 @@ from __future__ import annotations
 import numpy as np
 
 from sraz.core.mcts import MCTS
-from tests.mcts_envs import TableGame, UniformNet, make_binary_tree
+from tests.helpers.mcts_envs import GridBanditGame, TableGame, UniformNet, make_binary_tree
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -345,3 +345,91 @@ def test_noise_masked_positions_stay_zero_after_search():
         f"UCB at masked arm should be -inf, got {ucbs[MASKED_ARM]} "
         f"(ucbs={ucbs})"
     )
+
+
+# ---------------------------------------------------------------------------
+# Regression: multi-dimensional (MultiDiscrete) action spaces
+#
+# Before the fix, root Dirichlet noise was drawn as
+#   np.random.dirichlet([alpha] * len(nn_policy))
+# where len() is only the FIRST axis of a 2-D policy. For a square grid this
+# broadcast an identical row across the grid (statistically wrong noise); for
+# a non-square grid `noise * mask` raised ValueError. The fix sizes the draw
+# by nn_policy.size and reshapes to nn_policy.shape.
+# ---------------------------------------------------------------------------
+
+
+def test_noise_multidim_square_grid_reshapes_and_is_not_row_broadcast():
+    game = GridBanditGame(np.ones((3, 3)))
+    net = UniformNet((3, 3), value=0.0)
+    mcts = MCTS(game, net, n_simulations=0, temperature=1.0, c_exploration=1.5,
+                rng=np.random.default_rng(0))
+    mcts.perform_simulations(None, add_noise=True)
+    root = mcts.nodes[game.hashable_obs]
+
+    assert root.nn_policy.shape == (3, 3), (
+        f"noise must be reshaped to the 2-D policy shape, got {root.nn_policy.shape}"
+    )
+    assert np.isclose(root.nn_policy.sum(), 1.0), (
+        f"noise-mixed policy over all 9 cells should sum to 1, got {root.nn_policy.sum()}"
+    )
+    assert np.all(root.nn_policy >= 0)
+    # Recover the injected noise; the bug produced three identical rows.
+    eps = mcts.dirichlet_epsilon
+    residual = (root.nn_policy - (1 - eps) * root.nn_policy_original) / eps
+    rows_identical = (np.allclose(residual[0], residual[1])
+                      and np.allclose(residual[1], residual[2]))
+    assert not rows_identical, (
+        f"noise should be a genuine 9-cell Dirichlet, not one row broadcast "
+        f"across the grid: residual=\n{residual}"
+    )
+
+
+def test_noise_multidim_nonsquare_grid_does_not_crash():
+    # Pre-fix: `noise * mask` raised ValueError (shapes (2,) vs (2, 5)).
+    game = GridBanditGame(np.ones((2, 5)))
+    net = UniformNet((2, 5), value=0.0)
+    mcts = MCTS(game, net, n_simulations=0, temperature=1.0, c_exploration=1.5,
+                rng=np.random.default_rng(0))
+    mcts.perform_simulations(None, add_noise=True)
+    root = mcts.nodes[game.hashable_obs]
+    assert root.nn_policy.shape == (2, 5)
+    assert np.isclose(root.nn_policy.sum(), 1.0)
+
+
+def test_noise_multidim_reuse_path_does_not_crash():
+    # The same sizing bug was duplicated in perform_simulations_reuse (:250).
+    game = GridBanditGame(np.ones((2, 3)))
+    net = UniformNet((2, 3), value=0.0)
+    mcts = MCTS(game, net, n_simulations=0, rng=np.random.default_rng(1))
+    mcts.perform_simulations(None)  # expand root so nn_policy_original exists
+    mcts.perform_simulations_reuse(None, add_noise=True)  # re-injection path
+    root = mcts.nodes[game.hashable_obs]
+    assert root.nn_policy.shape == (2, 3)
+    assert np.isclose(root.nn_policy.sum(), 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Regression: MCTS exploration RNG is the injected Generator, not global
+# np.random. This is what makes seeded self-play reproducible and, under
+# multiprocessing, uncorrelated across workers.
+# ---------------------------------------------------------------------------
+
+
+def test_noise_uses_injected_rng_and_ignores_global_np_random():
+    def run(seed, global_seed):
+        np.random.seed(global_seed)  # must NOT influence MCTS noise
+        game = _make_masked_bandit()
+        mcts = MCTS(game, UniformNet(4), n_simulations=0, c_exploration=1.5,
+                    rng=np.random.default_rng(seed))
+        mcts.perform_simulations(None, add_noise=True)
+        return np.array(mcts.nodes["root"].nn_policy, copy=True)
+
+    same_seed_diff_global_a = run(seed=5, global_seed=0)
+    same_seed_diff_global_b = run(seed=5, global_seed=987654321)
+    diff_seed = run(seed=6, global_seed=0)
+
+    # Same injected seed => identical noise regardless of the global RNG state.
+    np.testing.assert_allclose(same_seed_diff_global_a, same_seed_diff_global_b)
+    # A different injected seed genuinely changes the draw.
+    assert not np.allclose(same_seed_diff_global_a, diff_seed)

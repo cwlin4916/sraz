@@ -33,7 +33,7 @@ from __future__ import annotations
 import numpy as np
 
 from sraz.core.mcts import MCTS
-from tests.mcts_envs import (
+from tests.helpers.mcts_envs import (
     FixedPolicyNet,
     GridBanditGame,
     TableGame,
