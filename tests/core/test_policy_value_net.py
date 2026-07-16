@@ -1,6 +1,7 @@
 """core/policy_value_net.py: PolicyValueNet ABC, TorchPolicyValueNet checkpoint/
 multiprocessing handoff, and the shared PolicyValueNetModel MLP."""
 
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
@@ -9,6 +10,7 @@ from sraz.core.policy_value_net import (
     PolicyValueNet,
     TorchPolicyValueNet,
     PolicyValueNetModel,
+    UniformPolicyValueNet,
 )
 
 
@@ -213,3 +215,22 @@ def test_model_policy_logits_unnormalized():
     # forward returns raw logits, not a distribution
     sums = policy.sum(dim=-1)
     assert not torch.allclose(sums, torch.ones_like(sums))
+
+
+# ---------------------------------------------------------------------------
+# UniformPolicyValueNet (net-free "pure MCTS" stand-in)
+# ---------------------------------------------------------------------------
+
+def test_uniform_policy_value_net_is_net_free_uniform():
+    net = UniformPolicyValueNet(n_actions=6)
+    p, v = net.predict("any state")          # ignores the state entirely
+    assert p.shape == (6,) and np.allclose(p, 1 / 6)
+    assert v.shape == () and float(v) == 0.0
+    # fresh array each call (the MCTS masks/normalizes the prior in place)
+    p2, _ = net.predict("other")
+    assert p2 is not p
+    # no learnable weights, and no .model attribute to checkpoint
+    assert not hasattr(net, "model")
+    # train is a no-op returning the Trainer's 5-tuple unpack shape
+    out = net.train([("s", None, 0.0)])
+    assert len(out) == 5

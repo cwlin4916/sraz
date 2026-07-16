@@ -134,3 +134,19 @@ def test_build_selects_problem_grammar_and_target(tmp_path):
     assert "sin" not in game.target_infix
     # the default config is still the sine instance (unchanged)
     assert SymRegConfig().problem == "sine"
+
+
+def test_build_pure_mcts_is_net_free_with_rollouts(tmp_path):
+    from sraz.core.policy_value_net import UniformPolicyValueNet
+    cfg = SymRegConfig(problem="additive_quadratic", pure_mcts=True)
+    cfg.trainer.checkpoint_dir = str(tmp_path / "ckpt")
+    game, net, agent, _ = cfg.build()
+    assert isinstance(net, UniformPolicyValueNet)
+    assert not hasattr(net, "model")             # genuinely net-free
+    assert agent.net is net
+    # leaf value comes purely from random rollouts, not a (zero) net value
+    assert agent.mcts_params["rollout_n"] > 0
+    assert agent.mcts_params["rollout_blend"] == 0.0
+    # the default (pure_mcts=False) config is still the learned AlphaZero net
+    _, net2, _, _ = SymRegConfig(problem="additive_quadratic").build()
+    assert isinstance(net2, SymRegPolicyValueNet)

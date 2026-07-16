@@ -38,7 +38,8 @@ def _save_final_checkpoint(ckpt_path: Path, trainer, agent, net):
     """
     ckpt_path = Path(ckpt_path)
     ckpt_path.mkdir(parents=True, exist_ok=True)
-    torch.save(net.model.state_dict(), ckpt_path / "network.pt")
+    if hasattr(net, "model"):  # UniformPolicyValueNet (pure MCTS) has no weights
+        torch.save(net.model.state_dict(), ckpt_path / "network.pt")
     with open(ckpt_path / "trainer_state.pkl", "wb") as f:
         pickle.dump({
             "all_training_examples": trainer.all_training_examples,
@@ -216,6 +217,11 @@ def parse_args():
                    help="Token-buffer length (default: 15; the full target needs 19)")
     p.add_argument("--redraw-constants", action="store_true",
                    help="Redraw target constants each episode (original behavior)")
+    p.add_argument("--pure-mcts", action="store_true",
+                   help="Net-free classic MCTS (uniform prior + random rollouts), "
+                        "no learned network -- the 'no NN' search baseline.")
+    p.add_argument("--rollout-n", type=int, default=None,
+                   help="Random rollouts per leaf (for --pure-mcts; default 20).")
     p.add_argument("--out", type=str, default=None,
                    help="Output root dir (default: experiments/symreg)")
     return p.parse_args()
@@ -225,11 +231,13 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parse_args()
 
-    cfg = SymRegConfig(problem=args.problem)
+    cfg = SymRegConfig(problem=args.problem, pure_mcts=args.pure_mcts)
     if args.n_iterations is not None:
         cfg.run.n_iterations = args.n_iterations
     if args.n_simulations is not None:
         cfg.agent.mcts_params["n_simulations"] = args.n_simulations
+    if args.rollout_n is not None:
+        cfg.agent.mcts_params["rollout_n"] = args.rollout_n
     if args.n_games is not None:
         cfg.trainer.n_games_per_train = args.n_games
     if args.max_len is not None:
@@ -241,7 +249,8 @@ def main():
     cfg.agent.random_seeds = {
         "mcts": s, "train": s + 1, "eval": s + 2, "external_policy": s + 3,
     }
-    cfg.net.kwargs["random_seed"] = s
+    if not args.pure_mcts:  # the uniform net has no weights to seed
+        cfg.net.kwargs["random_seed"] = s
 
     out_root = Path(args.out) if args.out else None
     exp_dir = setup_experiment_dir(cfg, seed=s, out_root=out_root)

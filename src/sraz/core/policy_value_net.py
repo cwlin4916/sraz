@@ -2,6 +2,7 @@ from typing import Any, Iterable
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -183,3 +184,45 @@ class PolicyValueNetModel(nn.Module):
         policy = self.policy_head(x)
         value = self.value_head(x).squeeze(-1)
         return policy, value
+
+
+class UniformPolicyValueNet(PolicyValueNet):
+    """A net-free stand-in that turns the AlphaZero MCTS into classic, pure MCTS.
+
+    Returns a uniform policy prior and a zero value, with no learnable
+    parameters. Combined with rollout leaf evaluation (``rollout_n > 0`` and
+    ``rollout_blend = 0.0``) the search becomes net-free Monte-Carlo Tree
+    Search: the prior is uninformative (uniform over the legal moves once the
+    game mask is applied) and every leaf is evaluated purely by random
+    rollouts. ``train`` is a no-op -- there is nothing to learn -- so this is a
+    fixed search procedure, useful as the "how much does the network add?"
+    baseline against the learned net.
+
+    Has no ``.model`` attribute (there is no network), so callers that persist
+    weights must guard on ``hasattr(net, "model")``.
+    """
+
+    def __init__(self, n_actions: int):
+        self.n_actions = int(n_actions)
+
+    def predict(self, state):
+        # Fresh arrays each call: the MCTS masks/normalizes the prior in place.
+        return (np.ones(self.n_actions, dtype=np.float64) / self.n_actions,
+                np.array(0.0, dtype=np.float64))
+
+    def train(self, examples):
+        # Nothing to learn; return the 5-tuple shape the Trainer unpacks
+        # (model, batch_losses, train_losses, policy_losses, value_losses).
+        return None, [0.0], [0.0], [0.0], [0.0]
+
+    def save_checkpoint(self, save_dir):
+        pass  # no parameters to save
+
+    def load_checkpoint(self, save_dir):
+        pass
+
+    def push_multiprocessing(self):
+        return None  # no tensors to move
+
+    def pop_multiprocessing(self, *args):
+        pass

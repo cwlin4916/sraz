@@ -6,6 +6,7 @@ from sraz.instances.symreg.game import SymRegGame
 from sraz.instances.symreg.network import SymRegPolicyValueNet
 from sraz.instances.symreg.problems import get_problem
 from sraz.core.agent import Agent
+from sraz.core.policy_value_net import UniformPolicyValueNet
 from sraz.training.trainer import Trainer
 
 from sraz.core.config import (
@@ -23,13 +24,17 @@ from sraz.core.config import (
 class SymRegConfig(MetaConfig):
     """Configuration for symbolic-regression AlphaZero training."""
 
-    def __init__(self, problem: str = "sine"):
+    def __init__(self, problem: str = "sine", pure_mcts: bool = False):
         super().__init__()
         # Which named instance to build (see instances/symreg/problems.py). The
         # grammar + target are injected in build(); the config's game.kwargs
         # stays limited to max_len/redraw/problem_seed so the shipped default is
         # unchanged.
         self.problem = problem
+        # pure_mcts=True builds a net-free classic MCTS (uniform prior + random
+        # rollouts) instead of the learned AlphaZero net -- the "no network"
+        # search baseline.
+        self.pure_mcts = pure_mcts
         self.game = GameConfig(
             game_cls=SymRegGame,
             kwargs={
@@ -77,16 +82,25 @@ class SymRegConfig(MetaConfig):
         # prob.game_kwargs() supplies (grammar, target); self.game.kwargs supplies
         # max_len/redraw/problem_seed. No key overlap, so the merge is clean.
         game = SymRegGame(**{**prob.game_kwargs(), **self.game.kwargs})
-        net_kwargs = {
-            "state_len": game.state_len,
-            "n_tokens": game.grammar.nsym + 1,
-            "n_actions": game.state_len * game.grammar.nprods,
-        } | self.net.kwargs
-        net = SymRegPolicyValueNet(**net_kwargs)
+        n_actions = game.state_len * game.grammar.nprods
+        mcts_params = self.agent.mcts_params
+        if self.pure_mcts:
+            # Net-free classic MCTS: uniform prior + random-rollout leaf values.
+            net = UniformPolicyValueNet(n_actions=n_actions)
+            mcts_params = {**mcts_params}
+            mcts_params.setdefault("rollout_n", 20)  # value comes from rollouts
+            mcts_params["rollout_blend"] = 0.0       # ignore the (zero) net value
+        else:
+            net_kwargs = {
+                "state_len": game.state_len,
+                "n_tokens": game.grammar.nsym + 1,
+                "n_actions": n_actions,
+            } | self.net.kwargs
+            net = SymRegPolicyValueNet(**net_kwargs)
         agent = Agent(
             game=game,
             net=net,
-            mcts_params=self.agent.mcts_params,
+            mcts_params=mcts_params,
             reward_discount=self.agent.reward_discount,
             external_policy=self.agent.external_policy,
             random_seeds=self.agent.random_seeds,
