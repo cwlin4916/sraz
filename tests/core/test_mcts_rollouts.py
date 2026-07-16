@@ -39,7 +39,7 @@ from __future__ import annotations
 import numpy as np
 
 from sraz.core.mcts import MCTS
-from tests.mcts_envs import (
+from tests.helpers.mcts_envs import (
     FixedPolicyNet,
     GridBanditGame,
     TableGame,
@@ -213,33 +213,36 @@ def test_budget_truncates_incomplete_rollouts():
 
 def test_mean_vs_max_modes():
     """Bandit [0.0, 1.0]: each rollout is one uniform-random arm pull that
-    consumes exactly one np.random.randint(2) draw, and arm k rewards k.
-    mode="mean" therefore equals the exact average of seed 0's 30 draws
-    (they sum to 17, so 17/30); mode="max" is exactly 1.0 once any pull
-    hits arm 1."""
-    # Replay seed 0's draw sequence to compute the exact expected mean.
-    np.random.seed(0)
-    draws = [np.random.randint(2) for _ in range(30)]
+    consumes exactly one ``rng.integers(2)`` draw, and arm k rewards k.
+    mode="mean" therefore equals the exact average of the injected generator's
+    30 draws; mode="max" is exactly 1.0 once any pull hits arm 1.
+
+    The generator is injected explicitly: MCTS draws from its own
+    ``self.rng``, and the default is an unseeded ``default_rng()``, so an
+    un-injected search is not reproducible."""
+    # Replay the same seed's draw sequence to compute the exact expected mean.
+    replay = np.random.default_rng(0)
+    draws = [int(replay.integers(2)) for _ in range(30)]
     expected_mean = sum(draws) / 30.0
     # Sanity: both arms were hit, so mean and max genuinely differ.
     assert 0.0 < expected_mean < 1.0
 
-    np.random.seed(0)
     game = make_bandit([0.0, 1.0])
     net = UniformNet(2, value=-5.0)  # sentinel: rollout must replace this
     mcts = MCTS(game, net, n_simulations=0, rollout_n=30,
-                rollout_mode="mean", rollout_blend=0.0)
+                rollout_mode="mean", rollout_blend=0.0,
+                rng=np.random.default_rng(0))
     root = _expand_root(mcts)
     assert float(root.nn_value) == expected_mean, (
         f"mean of 30 seeded pulls over rewards (0, 1) must equal the "
         f"replayed draw average {expected_mean}, got {float(root.nn_value)}"
     )
 
-    np.random.seed(0)
     game_max = make_bandit([0.0, 1.0])
     net_max = UniformNet(2, value=-5.0)
     mcts_max = MCTS(game_max, net_max, n_simulations=0, rollout_n=30,
-                    rollout_mode="max", rollout_blend=0.0)
+                    rollout_mode="max", rollout_blend=0.0,
+                    rng=np.random.default_rng(0))
     root_max = _expand_root(mcts_max)
     assert float(root_max.nn_value) == 1.0, (
         f"max over 30 seeded pulls must hit the 1.0 arm at least once, "

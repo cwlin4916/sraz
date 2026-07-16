@@ -268,9 +268,9 @@ def test_train_iteration_populates_diagnostics_and_merges_leaf_caches(tmp_path):
 
 
 def test_train_iteration_symreg_end_to_end(tmp_path):
-    # MCTS root Dirichlet noise draws from the global legacy np.random
-    # (mcts.py:132) -- seed it so the episode is reproducible.
-    np.random.seed(0)
+    # MCTS exploration RNG now flows from the Agent's seeded "mcts" stream
+    # (SymRegConfig sets it), so the episode is reproducible without touching
+    # the process-global np.random. torch.manual_seed pins net weight init.
     torch.manual_seed(0)
     cfg = _cheap_symreg_cfg(tmp_path)
     game, net, agent, trainer = cfg.build()
@@ -298,12 +298,13 @@ def test_train_iteration_symreg_end_to_end(tmp_path):
 
 
 def test_collect_training_examples_deterministic_across_builds(tmp_path):
-    # MCTS root Dirichlet noise draws from the global legacy np.random
-    # (mcts.py:132), which the config seeds do not cover -- pin it per run.
+    # Determinism now flows entirely from the Agent's seeded RNG streams
+    # (SymRegConfig fixes "mcts"/"train"), which feed per-game reset and
+    # interaction seeds; the interaction seed drives MCTS exploration. No
+    # global np.random seeding needed.
     rewards = []
     lengths = []
     for _ in range(2):
-        np.random.seed(7)
         cfg = _cheap_symreg_cfg(tmp_path)
         _, _, _, trainer = cfg.build()
         results = trainer._collect_training_examples()

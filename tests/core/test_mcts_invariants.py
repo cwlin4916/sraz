@@ -37,7 +37,7 @@ import numpy as np
 import pytest
 
 from sraz.core.mcts import MCTS
-from tests.mcts_envs import (
+from tests.helpers.mcts_envs import (
     GridBanditGame,
     UniformNet,
     make_bandit,

@@ -74,7 +74,8 @@ class Agent:
     
     def policy(self, state: Game, msg=None,
                add_noise: bool = True,
-               temperature_override: float | None = None) -> np.ndarray:
+               temperature_override: float | None = None,
+               rng: np.random.Generator | None = None) -> np.ndarray:
         """
         The function returns the move probabilities for a game state.
 
@@ -86,6 +87,10 @@ class Agent:
             temperature_override (float | None): If set, override the MCTS temperature
                 for converting visit counts to probabilities. Low values (e.g. 0.05)
                 give near-greedy action selection for evaluation.
+            rng (np.random.Generator | None): Source of MCTS exploration randomness
+                (root Dirichlet noise, random rollouts). Passed through to the MCTS so
+                self-play is reproducible from a seeded stream instead of the process-
+                global np.random. If None, the MCTS falls back to its own default_rng().
 
         Returns:
             np.ndarray: Move probabilities, shape equal to the action space.
@@ -95,7 +100,7 @@ class Agent:
         if self.external_policy is not None:
             move_probs = self.external_policy(current_game_state)
         else:
-            mcts = MCTS(current_game_state, self.net, **self.mcts_params)
+            mcts = MCTS(current_game_state, self.net, rng=rng, **self.mcts_params)
             if temperature_override is not None:
                 mcts.temperature = temperature_override
             move_probs = mcts.perform_simulations("", add_noise=add_noise)
@@ -106,11 +111,17 @@ class Agent:
     def play_one_round(self, game: Game, max_moves: int = 10_000,
                        random_seed: int | None = None, msg="",
                        add_noise: bool = True,
-                       temperature_override: float | None = None):
+                       temperature_override: float | None = None,
+                       clone_game: bool = True):
         """
         The function plays for one round from the given game state using the agent's policy.
+
+        clone_game (bool): If True (default) the round is played on an independent
+            clone, leaving the caller's `game` untouched. Pass False to step `game`
+            in place -- used by play_for_experience so the stepped game (and any
+            leaf_evaluator caches it accumulates) is observable after the round.
         """
-        current_game_state = game.clone()
+        current_game_state = game.clone() if clone_game else game
         rng = np.random.default_rng(random_seed)
 
         collected_experience = []
@@ -122,7 +133,8 @@ class Agent:
             # We assume that move_probs has already been flattened inside the policy function.
             move_probs = self.policy(current_game_state, "",
                                      add_noise=add_noise,
-                                     temperature_override=temperature_override)
+                                     temperature_override=temperature_override,
+                                     rng=rng)
             action_idx = rng.choice(len(move_probs), p=move_probs)
             """
             The implementation here is different from the original implementation in that
@@ -154,17 +166,24 @@ class Agent:
     def play_one_round_reuse_tree(self, game: Game, max_moves: int = 10_000,
                                    random_seed: int | None = None, msg="",
                                    add_noise: bool = True,
-                                   temperature_override: float | None = None):
+                                   temperature_override: float | None = None,
+                                   clone_game: bool = True):
         """Play one round using a single MCTS tree reused across all moves.
 
         Unlike play_one_round (which creates a fresh MCTS per move via policy()),
         this method creates one MCTS at the start and reuses its tree across
         all moves via perform_simulations_reuse() + advance_to().
+
+        clone_game (bool): If True (default) the MCTS plays on an independent
+            clone, leaving the caller's `game` untouched. Pass False to let the
+            MCTS step `game` in place so its accumulated leaf_evaluator caches are
+            observable after the round (used by play_for_experience_reuse_tree).
         """
-        mcts = MCTS(game.clone(), self.net, **self.mcts_params)
+        rng = np.random.default_rng(random_seed)
+        mcts = MCTS(game.clone() if clone_game else game, self.net,
+                    rng=rng, **self.mcts_params)
         if temperature_override is not None:
             mcts.temperature = temperature_override
-        rng = np.random.default_rng(random_seed)
 
         collected_experience = []
         collected_rewards = []
@@ -226,9 +245,14 @@ class Agent:
         current_game_state = game.clone() # we make sure that it doesn't interfere with the original game state.
         current_game_state.reset_wrapper(seed=reset_seed)
 
+        # clone_game=False: play_one_round steps THIS object in place, so the
+        # leaf_evaluator caches accumulated during the episode are observable
+        # here. (With the default clone, play_one_round would step an internal
+        # clone and current_game_state would export an empty/baseline cache.)
         result = self.play_one_round(current_game_state, random_seed=interaction_seed, msg="",
                                      add_noise=add_noise,
-                                     temperature_override=temperature_override)
+                                     temperature_override=temperature_override,
+                                     clone_game=False)
         return (*result, self._extract_leaf_eval_data(current_game_state))
 
     def play_for_experience_reuse_tree(self, game: Game, id: int, reset_seed: int, interaction_seed,
@@ -241,7 +265,10 @@ class Agent:
         current_game_state = game.clone()
         current_game_state.reset_wrapper(seed=reset_seed)
 
+        # clone_game=False so the reuse-tree MCTS steps THIS object (via
+        # advance_to), making its accumulated leaf_evaluator caches observable.
         result = self.play_one_round_reuse_tree(current_game_state, random_seed=interaction_seed, msg="",
                                                  add_noise=add_noise,
-                                                 temperature_override=temperature_override)
+                                                 temperature_override=temperature_override,
+                                                 clone_game=False)
         return (*result, self._extract_leaf_eval_data(current_game_state))

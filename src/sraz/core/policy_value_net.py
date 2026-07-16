@@ -95,6 +95,13 @@ class UniformPolicyValueNet(PolicyValueNet):
     `predict` returns a **fresh** array each call. MCTS masks the prior in
     place (`query_net_masked`), so a shared buffer would be silently corrupted
     after the first masked state.
+
+    Pairs with rollout leaf evaluation (`rollout_n > 0`, `rollout_blend = 0.0`)
+    to give net-free classic MCTS: uninformative prior, leaves valued purely by
+    random rollouts.
+
+    Has no `.model` attribute, so callers that persist weights must guard on
+    `hasattr(net, "model")`.
     """
 
     def __init__(self, n_actions: int, value: float = 0.0):

@@ -128,6 +128,34 @@ def target_ys(xs: np.ndarray, constants: dict[str, float]) -> np.ndarray:
             + constants["C0"] + constants["C1"] * xs + constants["C2"] * xs ** 2)
 
 
+# ---------------------------------------------------------------------------
+# Additive "best-corner" instance: a pruned, division/sine-free grammar whose
+# expressions are sums of monomials, and a target that is exactly expressible.
+#
+# Because the reward is R^2 of a least-squares fit, adding a term = adding a
+# free parameter, which can only improve or equal the fit -> the reward
+# gradient points monotonically toward richer sums (non-deceptive), and with
+# no division/sine there are no -1 fit failures, so partial structures score
+# cleanly under weak completion (informative). See
+# Claude-research/02-informativeness-and-deception.md.
+# ---------------------------------------------------------------------------
+
+ADDITIVE_GRAMMAR = {
+    "S": [
+        ["+", "S", "S"],        # compose by addition
+        ["C0"],                 # constant
+        ["*", "C1", "x"],       # linear
+        ["*", "C2", "*", "x", "x"],  # quadratic
+    ],
+}
+
+ADDITIVE_INFIX = "C0 + C1*x + C2*x**2"
+
+
+def target_ys_additive(xs: np.ndarray, constants: dict[str, float]) -> np.ndarray:
+    return (constants["C0"] + constants["C1"] * xs + constants["C2"] * xs ** 2)
+
+
 def fit_expression(rule: str, xs: np.ndarray, exact_ys: np.ndarray,
                    max_nfev: int | None = None) -> float:
     """Fit the C* constants of a prefix expression to the data; return clipped R².
@@ -186,10 +214,23 @@ class SymRegGame(Game[np.ndarray, int]):
     """
 
     def __init__(self, max_len: int = 15, redraw_constants: bool = False,
-                 problem_seed: int = 0, target: "Target | str | None" = None,
-                 lmfit_max_nfev: int | None = None):
+                 problem_seed: int = 0,
+                 target: "Target | str | None" = None,
+                 lmfit_max_nfev: int | None = None,
+                 grammar_rules: dict | None = None,
+                 target_ys_fn=None,
+                 constant_names: tuple | None = None,
+                 target_infix: str | None = None,
+                 x_min: float = X_MIN, x_max: float = X_MAX, n_x: int = N_X):
         super().__init__()
-        self.grammar = compile_grammar(SR_GRAMMAR)
+        # (grammar, target) default to the sine instance, so the shipped game is
+        # unchanged; pass them to build any other instance (see problems.py).
+        self.grammar = compile_grammar(grammar_rules if grammar_rules is not None
+                                       else SR_GRAMMAR)
+        self._target_ys_fn = target_ys_fn if target_ys_fn is not None else target_ys
+        self.constant_names = (tuple(constant_names) if constant_names is not None
+                               else ("C0", "C1", "C2"))
+        self.target_infix = target_infix if target_infix is not None else TARGET_INFIX
         g = self.grammar
         self.state_len = max_len
         self.observation_space = spaces.MultiDiscrete([g.nsym + 1] * max_len)
@@ -205,20 +246,31 @@ class SymRegGame(Game[np.ndarray, int]):
         self.target = target
 
         if target is None:
-            # Legacy instance: the sinusoid target on [1, 3], C* drawn from the
-            # problem seed. Unchanged so earlier notes stay reproducible.
-            self.xs = np.linspace(X_MIN, X_MAX, N_X)
+            # Parameterized instance: (grammar, target fn, domain) all default to
+            # the sine instance, so the shipped game is unchanged and earlier
+            # notes stay reproducible.
+            self.xs = np.linspace(x_min, x_max, n_x)
             self._redraw_rng = np.random.default_rng(problem_seed)
             self.constants = self._draw_constants(np.random.default_rng(problem_seed))
-            self.exact_ys = target_ys(self.xs, self.constants)
+            self.exact_ys = self._target_ys_fn(self.xs, self.constants)
         else:
             # A named target fixes both the function and its grid, so there is
             # nothing left for a seed to draw and redrawing is meaningless.
+            # target.xs() is authoritative: x_min/x_max/n_x do not apply here.
             if redraw_constants:
                 raise ValueError(
                     "redraw_constants=True is incompatible with a fixed target: "
                     f"{target.name}'s coefficients are chosen, not sampled."
                 )
+            if target_ys_fn is not None:
+                raise ValueError(
+                    "target_ys_fn is incompatible with a fixed target: "
+                    f"{target.name} supplies its own ys."
+                )
+            if target_infix is None:
+                # The runners print target_infix as the ground truth; the sine
+                # default would be a lie for a fixed target.
+                self.target_infix = target.infix
             self._redraw_rng = np.random.default_rng(problem_seed)
             self.xs = target.xs()
             self.constants = {f"c{i}": c for i, c in enumerate(target.coeffs)}
@@ -230,10 +282,9 @@ class SymRegGame(Game[np.ndarray, int]):
         self.real_state_len = 0
         self.reset_wrapper()
 
-    @staticmethod
-    def _draw_constants(rng: np.random.Generator) -> dict[str, float]:
+    def _draw_constants(self, rng: np.random.Generator) -> dict[str, float]:
         return {name: float(C_MIN + (C_MAX - C_MIN) * rng.random())
-                for name in ("C0", "C1", "C2")}
+                for name in self.constant_names}
 
     def reset(self, seed=None):
         g = self.grammar
@@ -243,7 +294,7 @@ class SymRegGame(Game[np.ndarray, int]):
         if self.redraw_constants:
             rng = np.random.default_rng(seed) if seed is not None else self._redraw_rng
             self.constants = self._draw_constants(rng)
-            self.exact_ys = target_ys(self.xs, self.constants)
+            self.exact_ys = self._target_ys_fn(self.xs, self.constants)
             self._fit_cache = {}
         return self.state.copy(), {}
 
