@@ -30,7 +30,9 @@ class Trainer:
                  n_past_iterations_to_train: Optional[int] = 20,
                  n_procs: Optional[int] = None,
                  checkpoint_dir: str | Path = "checkpoints",
-                 use_tree_reuse: bool = False):
+                 use_tree_reuse: bool = False,
+                 self_play_add_noise: bool = True,
+                 self_play_temperature: Optional[float] = None):
         """
         Initialize the Trainer.
 
@@ -42,6 +44,11 @@ class Trainer:
             n_procs: Number of processes for multiprocessing
             checkpoint_dir: Directory to save checkpoints
             use_tree_reuse: If True, use MCTS tree reuse across moves within each episode
+            self_play_add_noise: If True, mix Dirichlet noise into the prior at
+                each self-play MCTS root. Turn off to measure structural search
+                without injected entropy.
+            self_play_temperature: If set, override the MCTS temperature for
+                self-play visit-count sampling. None keeps the agent's own.
         """
         self.agent = agent
         self.net = net
@@ -50,6 +57,8 @@ class Trainer:
         self.n_past_iterations_to_train = n_past_iterations_to_train
         self.n_procs = n_procs
         self.use_tree_reuse = use_tree_reuse
+        self.self_play_add_noise = self_play_add_noise
+        self.self_play_temperature = self_play_temperature
 
         self.all_training_examples = []
         self._last_diagnostics: list = []
@@ -88,7 +97,11 @@ class Trainer:
         play_fn = (self.agent.play_for_experience_reuse_tree
                    if self.use_tree_reuse
                    else self.agent.play_for_experience)
-        multiprocessing_function = partial(play_fn, self.game)
+        multiprocessing_function = partial(
+            play_fn, self.game,
+            add_noise=self.self_play_add_noise,
+            temperature_override=self.self_play_temperature,
+        )
         
         try:
             arg_tuples = [

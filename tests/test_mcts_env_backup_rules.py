@@ -19,10 +19,14 @@ Tests:
     q_min / q_max bookkeeping semantics of update_edge.
 8.  test_constructor_rejects_unknown_rule — backup_rule="median" asserts.
 9.  test_ucb_qnorm_regimes — the three q_norm regimes (infinite init bounds,
-    q_min == q_max, spread bounds) on a hand-built node.
-10. test_ucb_masked_entries_neg_inf_1d_and_2d — masked positions are -inf in
+    q_min == q_max, spread bounds) on a hand-built node, asserted bit-exactly
+    on the 1D fast path.
+10. test_ucb_qnorm_regimes_2d_fallback — the same three q_norm regimes
+    asserted bit-exactly on the multi-dimensional fallback, plus a
+    masked-cell variant.
+11. test_ucb_masked_entries_neg_inf_1d_and_2d — masked positions are -inf in
     the 1D fast path and the multi-dimensional fallback.
-11. test_chain_exact_total_integration — backup_rule="max" wiring reaches
+12. test_chain_exact_total_integration — backup_rule="max" wiring reaches
     search(): root Q equals the exact chain return.
 """
 
@@ -250,7 +254,10 @@ def _hand_built_node(mask: np.ndarray) -> MCTSTreeNode:
 
 
 def test_ucb_qnorm_regimes():
-    """The three q_norm regimes in calc_masked_ucbs (1D fast path):
+    """The three q_norm regimes in calc_masked_ucbs (1D fast path), asserted
+    bit-exactly (the expected values replicate the float64 operation order of
+    the fast path, so any single-op perturbation — e.g. dropping EPS —
+    must fail):
     (a) q_min/q_max at their +-inf init values -> Q term contributes 0;
     (b) q_min == q_max -> q_norm 0.5 everywhere;
     (c) spread bounds (0, 2) with edge Qs {0, 1, 2} -> q_norm {0, 0.5, 1}."""
@@ -269,34 +276,119 @@ def test_ucb_qnorm_regimes():
         f"({mcts.q_min}, {mcts.q_max})"
     )
     ucbs_a = mcts.calc_masked_ucbs(node, msg=None)
-    assert np.allclose(ucbs_a, u), (
-        f"with infinite q bounds UCB must equal the exploration term:\n"
-        f"got {ucbs_a}\nexpected {u}"
+    np.testing.assert_array_equal(
+        ucbs_a, u,
+        err_msg="with infinite q bounds the UCB must equal the exploration "
+                "term bit-exactly (including the EPS inside sqrt)",
     )
 
     # (b) Degenerate spread: q_min == q_max -> q_norm is 0.5 everywhere.
     mcts.q_min = 1.0
     mcts.q_max = 1.0
     ucbs_b = mcts.calc_masked_ucbs(node, msg=None)
-    assert np.allclose(ucbs_b, 0.5 + u), (
-        f"with q_min == q_max UCB must be 0.5 + exploration term:\n"
-        f"got {ucbs_b}\nexpected {0.5 + u}"
-    )
-    assert np.allclose(ucbs_b - u, 0.5), (
-        f"q_norm should be 0.5 everywhere, got {ucbs_b - u}"
+    np.testing.assert_array_equal(
+        ucbs_b, 0.5 + u,
+        err_msg="with q_min == q_max the UCB must be exactly "
+                "0.5 + exploration term",
     )
 
     # (c) Spread bounds: q_norm = (Q - q_min) / (q_max - q_min) = {0, 0.5, 1}
-    # at the visited actions and 0 at the unvisited one (Q defaults to 0).
+    # at the visited actions and 0 at the unvisited one (Q defaults to 0);
+    # all four quotients are exact in float64.
     mcts.q_min = 0.0
     mcts.q_max = 2.0
     q_norm = (q_arr - mcts.q_min) / (mcts.q_max - mcts.q_min)
-    ucbs_c = mcts.calc_masked_ucbs(node, msg=None)
-    assert np.allclose(ucbs_c, q_norm + u), (
-        f"spread-regime UCB mismatch:\ngot {ucbs_c}\nexpected {q_norm + u}"
+    np.testing.assert_array_equal(
+        q_norm, [0.0, 0.5, 1.0, 0.0],
+        err_msg="self-check: expected q_norm values must be [0, 0.5, 1, 0]",
     )
-    assert np.allclose(ucbs_c - u, [0.0, 0.5, 1.0, 0.0]), (
-        f"q_norm should be [0, 0.5, 1, 0], got {ucbs_c - u}"
+    ucbs_c = mcts.calc_masked_ucbs(node, msg=None)
+    np.testing.assert_array_equal(
+        ucbs_c, q_norm + u,
+        err_msg="spread-regime UCB must equal q_norm + exploration term "
+                "bit-exactly",
+    )
+
+
+def _hand_built_node_2d(mask: np.ndarray) -> MCTSTreeNode:
+    """2D analogue of :func:`_hand_built_node`: non-uniform prior
+    [[0.4, 0.3], [0.2, 0.1]] over a 2x2 grid, edge Qs {0, 1, 2} on cells
+    (0,0)/(0,1)/(1,0) (cell (1,1) unvisited), N = [[2, 3], [5, 0]],
+    total_N = 10. The non-uniform prior makes the exploration term sensitive
+    to dropping the prior factor."""
+    node = MCTSTreeNode(0.0, False)
+    node.nn_policy = np.array([[0.4, 0.3], [0.2, 0.1]], dtype=np.float64)
+    node.action_mask = mask
+    node.action_Q = {(0, 0): 0.0, (0, 1): 1.0, (1, 0): 2.0}
+    node.action_N = {(0, 0): 2, (0, 1): 3, (1, 0): 5}
+    node.total_N = 10
+    return node
+
+
+def test_ucb_qnorm_regimes_2d_fallback():
+    """The three q_norm regimes on the multi-dimensional fallback of
+    calc_masked_ucbs, asserted bit-exactly (the expected values replicate the
+    per-cell float64 operation order of the fallback loop:
+    q_norm + c * P[a] * sqrt(total_N + EPS) / (1 + N[a])):
+    (a) infinite init bounds -> UCB is exactly the per-cell exploration term;
+    (b) q_min == q_max -> exactly 0.5 + exploration term;
+    (c) spread bounds (0, 2) -> q_norm [[0, 0.5], [1, 0]] + exploration term,
+        the unvisited cell (1, 1) taking the Q = 0 default.
+    A masked variant of (c) checks the masked cell is -inf while legal cells
+    keep their exact values."""
+    c = 1.5
+    mcts = _fresh_mcts(c_exploration=c)
+    node = _hand_built_node_2d(np.ones((2, 2), dtype=bool))
+
+    p_grid = node.nn_policy
+    n_grid = np.array([[2, 3], [5, 0]])
+    # Per-cell exploration term with the fallback's op order:
+    # (c * P[a]) * sqrt(total_N + EPS) / (1 + N[a]).
+    u = c * p_grid * np.sqrt(node.total_N + EPS) / (1 + n_grid)
+
+    # (a) Fresh search stats: q_norm contributes exactly 0 per cell.
+    ucbs_a = mcts.calc_masked_ucbs(node, msg=None)
+    assert ucbs_a.shape == (2, 2), (
+        f"2D UCB shape {ucbs_a.shape}, expected (2, 2)"
+    )
+    np.testing.assert_array_equal(
+        ucbs_a, u,
+        err_msg="2D fallback with infinite q bounds: UCB must equal the "
+                "per-cell exploration term bit-exactly",
+    )
+
+    # (b) Degenerate spread: q_norm is exactly 0.5 at every legal cell.
+    mcts.q_min = 1.0
+    mcts.q_max = 1.0
+    ucbs_b = mcts.calc_masked_ucbs(node, msg=None)
+    np.testing.assert_array_equal(
+        ucbs_b, 0.5 + u,
+        err_msg="2D fallback with q_min == q_max: UCB must be exactly "
+                "0.5 + exploration term",
+    )
+
+    # (c) Spread bounds (0, 2): Qs {0, 1, 2, 0-default} -> q_norm
+    # [[0, 0.5], [1, 0]], every quotient exact in float64.
+    mcts.q_min = 0.0
+    mcts.q_max = 2.0
+    q_norm = np.array([[0.0, 0.5], [1.0, 0.0]])
+    ucbs_c = mcts.calc_masked_ucbs(node, msg=None)
+    np.testing.assert_array_equal(
+        ucbs_c, q_norm + u,
+        err_msg="2D fallback spread-regime UCB must equal "
+                "q_norm + exploration term bit-exactly",
+    )
+
+    # Masked variant of (c): cell (0, 1) illegal -> exactly -inf there, and
+    # bit-identical UCBs at the remaining legal cells.
+    node_masked = _hand_built_node_2d(np.array([[1, 0], [1, 1]], dtype=bool))
+    expected_masked = (q_norm + u).copy()
+    expected_masked[0, 1] = -np.inf
+    ucbs_m = mcts.calc_masked_ucbs(node_masked, msg=None)
+    np.testing.assert_array_equal(
+        ucbs_m, expected_masked,
+        err_msg="2D fallback masked variant: masked cell must be -inf and "
+                "legal cells bit-identical to the unmasked values",
     )
 
 
@@ -317,6 +409,9 @@ def test_ucb_masked_entries_neg_inf_1d_and_2d():
     )
 
     # --- 2D fallback: GridBanditGame with cell (1, 1) masked out.
+    # (Exact UCB values of the fallback are pinned by
+    # test_ucb_qnorm_regimes_2d_fallback; this checks the mask wiring through
+    # a real search.)
     reward_grid = np.array([[0.1, 0.9], [0.4, 5.0]])
     mask_grid = np.array([[1, 1], [1, 0]])
     game = GridBanditGame(reward_grid, mask_grid)

@@ -2,6 +2,7 @@ from typing import Any, Iterable
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -77,6 +78,53 @@ class PolicyValueNet(ABC):
             *args: State returned from push_multiprocessing() to be restored.
         """
         pass
+
+class UniformPolicyValueNet(PolicyValueNet):
+    """A net that never learns: uniform prior, constant value.
+
+    Substituting this for a learned net turns AlphaZero into pure UCT. The
+    prior contributes a constant factor to every UCB term, so selection is
+    driven entirely by the Q values that search backs up, and `value` is what
+    a nonterminal leaf is worth before any rollout.
+
+    `train` is a no-op that reports zero losses: the caller's training loop
+    still runs, but nothing about the returned policy or value changes. An
+    "iteration" therefore batches self-play games without learning from them,
+    which is exactly the null baseline a learned run must beat.
+
+    `predict` returns a **fresh** array each call. MCTS masks the prior in
+    place (`query_net_masked`), so a shared buffer would be silently corrupted
+    after the first masked state.
+    """
+
+    def __init__(self, n_actions: int, value: float = 0.0):
+        super().__init__()
+        if n_actions <= 0:
+            raise ValueError(f"n_actions must be positive, got {n_actions}")
+        self.n_actions = n_actions
+        self.value = float(value)
+
+    def train(self, examples):
+        """No-op. Returns the 5-tuple shape `Trainer._train_network` unpacks."""
+        return None, [], [0.0], [0.0], [0.0]
+
+    def predict(self, state):
+        policy = np.full(self.n_actions, 1.0 / self.n_actions, dtype=np.float64)
+        return policy, np.float64(self.value)
+
+    def save_checkpoint(self, save_dir):
+        """Nothing to save: the net is fully determined by its constructor."""
+        pass
+
+    def load_checkpoint(self, save_dir):
+        pass
+
+    def push_multiprocessing(self):
+        pass
+
+    def pop_multiprocessing(self, *args):
+        pass
+
 
 class TorchPolicyValueNet(PolicyValueNet):
     """

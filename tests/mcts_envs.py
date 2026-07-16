@@ -158,9 +158,13 @@ class GridBanditGame(Game[int, tuple]):
 def make_bandit(rewards: list[float]) -> TableGame:
     """K-armed one-step bandit. Arm ``k`` yields ``rewards[k]``, terminal.
 
-    Ground truth: Q(root, k) == rewards[k] exactly under every backup rule
-    (each edge always backs up the same deterministic value); the optimal
-    arm is ``argmax(rewards)``.
+    Ground truth: the optimal arm is ``argmax(rewards)``. Every backup of
+    edge ``k`` is the same deterministic value ``rewards[k]``, so
+    Q(root, k) == rewards[k] bit-exactly under ``backup_rule="max"`` for
+    any reward, and under ``"mean"`` only when the reward is dyadic
+    (mean backup recomputes ``sum(values)/len(values)``, and e.g.
+    ``sum([0.2]*3)/3 != 0.2`` in float64 — use rewards like 0.25/0.5/1.0
+    for exact mean-backup assertions).
     """
     transitions: TransitionTable = {
         "root": {k: (("arm", k), float(r), True, False)

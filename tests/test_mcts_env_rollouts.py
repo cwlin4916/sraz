@@ -10,22 +10,28 @@ leaf-evaluation result (rollout/net blend) with zero search noise.
 ``make_chain`` has exactly one legal action per state, so every random
 rollout deterministically yields the full path total.
 
-Ten tests:
+Twelve tests:
 
  1. rollout_replaces_net_value          — blend=0.0: nn_value is the exact rollout return
- 2. blend_extremes_and_midpoint         — blend=1.0 → pure net value; blend=0.5 → exact midpoint
- 3. budget_zero_falls_back_to_net       — rollout_budget=0: _rollout_value returns None,
+ 2. rollout_respects_action_mask        — chain padded with a permanently illegal action
+                                          slot; sampling must draw from flatnonzero(mask)
+ 3. blend_extremes_and_midpoint         — blend=1.0 → pure net value; blend=0.5 → exact midpoint
+ 4. budget_zero_falls_back_to_net       — rollout_budget=0: _rollout_value returns None,
                                           nn_value falls back to the net value
- 4. budget_truncates_incomplete_rollouts — a rollout cut off mid-episode is excluded from
+ 5. budget_truncates_incomplete_rollouts — a rollout cut off mid-episode is excluded from
                                           the aggregate; exact _search_rollout_budget bookkeeping
- 5. mean_vs_max_modes                   — rollout_mode="mean" averages, "max" takes the best
- 6. rollout_does_not_query_net          — rollouts never call net.predict (root expansion only)
- 7. budget_resets_per_search            — _search_rollout_budget refills on every
+ 6. mean_vs_max_modes                   — rollout_mode="mean" equals the exact seeded draw
+                                          average, "max" takes the best
+ 7. rollout_does_not_query_net          — rollouts never call net.predict (root expansion only)
+ 8. budget_resets_per_search            — _search_rollout_budget refills on every
                                           perform_simulations call
- 8. direct_query_negative_sims          — n_simulations=-1 returns the net prior and builds
+ 9. direct_query_negative_sims          — n_simulations=-1 returns the net prior and builds
                                           no tree at all
- 9. direct_query_respects_mask          — masked arms get zero mass, the rest renormalise
-10. rollout_multidim_action_space       — MultiDiscrete rollouts step via np.unravel_index
+10. direct_query_temperature            — T=0.5 on the direct path squares the prior and
+                                          renormalises (exponentiation is really applied)
+11. direct_query_respects_mask          — masked arms get zero mass, the rest renormalise
+12. rollout_multidim_action_space       — MultiDiscrete rollouts step via np.unravel_index;
+                                          a lone legal cell pins the flat→(r,c) mapping
 """
 
 from __future__ import annotations
@@ -78,6 +84,33 @@ def test_rollout_replaces_net_value():
     assert float(root.nn_value) == 6.0, (
         f"blend=0.0 should give the pure rollout return 6.0, "
         f"got nn_value={float(root.nn_value)}"
+    )
+
+
+def test_rollout_respects_action_mask():
+    """Rollout action sampling must draw only from flatnonzero(mask).
+
+    Chain [1,2,3] padded to n_actions=2 with action 1 absent from every
+    transition row, so the mask is [True, False] at every state. Correct
+    sampling (valid = flatnonzero(mask)) can only ever pick action 0 and
+    each rollout returns exactly 6.0. Mask-ignoring sampling (e.g.
+    valid = arange(mask.size)) draws illegal action 1 within a few seeded
+    steps and trips TableGame.step's illegal-action assert loudly."""
+    np.random.seed(1234)
+    step_rewards = [1.0, 2.0, 3.0]
+    n = len(step_rewards)
+    transitions = {
+        i: {0: (i + 1, float(step_rewards[i]), i + 1 == n, False)}
+        for i in range(n)
+    }
+    game = TableGame(transitions, 0, n_actions=2)
+    net = UniformNet(2, value=7.0)
+    mcts = MCTS(game, net, n_simulations=0, rollout_n=3, rollout_blend=0.0)
+
+    root = _expand_root(mcts)
+    assert float(root.nn_value) == 6.0, (
+        f"mask [True, False] forces action 0 every step, so all rollouts "
+        f"return exactly 6.0, got nn_value={float(root.nn_value)}"
     )
 
 
@@ -179,18 +212,27 @@ def test_budget_truncates_incomplete_rollouts():
 
 
 def test_mean_vs_max_modes():
-    """Bandit [0.0, 1.0]: each rollout is one uniform-random arm pull.
-    mode="mean" over 30 pulls lands strictly between the arm values;
-    mode="max" is exactly 1.0 once any pull hits arm 1 (seeded, 30 pulls)."""
+    """Bandit [0.0, 1.0]: each rollout is one uniform-random arm pull that
+    consumes exactly one np.random.randint(2) draw, and arm k rewards k.
+    mode="mean" therefore equals the exact average of seed 0's 30 draws
+    (they sum to 17, so 17/30); mode="max" is exactly 1.0 once any pull
+    hits arm 1."""
+    # Replay seed 0's draw sequence to compute the exact expected mean.
+    np.random.seed(0)
+    draws = [np.random.randint(2) for _ in range(30)]
+    expected_mean = sum(draws) / 30.0
+    # Sanity: both arms were hit, so mean and max genuinely differ.
+    assert 0.0 < expected_mean < 1.0
+
     np.random.seed(0)
     game = make_bandit([0.0, 1.0])
     net = UniformNet(2, value=-5.0)  # sentinel: rollout must replace this
     mcts = MCTS(game, net, n_simulations=0, rollout_n=30,
                 rollout_mode="mean", rollout_blend=0.0)
     root = _expand_root(mcts)
-    assert 0.2 < float(root.nn_value) < 0.8, (
-        f"mean of 30 uniform pulls over rewards (0, 1) should lie in "
-        f"(0.2, 0.8), got {float(root.nn_value)}"
+    assert float(root.nn_value) == expected_mean, (
+        f"mean of 30 seeded pulls over rewards (0, 1) must equal the "
+        f"replayed draw average {expected_mean}, got {float(root.nn_value)}"
     )
 
     np.random.seed(0)
@@ -267,6 +309,28 @@ def test_direct_query_negative_sims():
     )
 
 
+def test_direct_query_temperature():
+    """Temperature exponentiation applies on the direct-query path too
+    (perform_simulations' docstring: 'results are still exponentiated').
+    T=0.5 squares the prior [0.7, 0.3] → [0.49, 0.09], renormalised to
+    [0.49, 0.09] / 0.58. At T=1 this would be indistinguishable from the
+    raw prior, so this case pins the /temperature division itself."""
+    game = make_bandit([0.0, 1.0])
+    net = FixedPolicyNet([0.7, 0.3])
+    mcts = MCTS(game, net, n_simulations=-1, temperature=0.5)
+
+    probs = mcts.perform_simulations(None)
+    expected = np.array([0.49, 0.09]) / 0.58
+    assert np.allclose(probs, expected), (
+        f"T=0.5 direct query should square-and-renormalise the prior: "
+        f"expected {expected}, got {probs}"
+    )
+    assert len(mcts.nodes) == 0, (
+        f"no tree should be built on the direct-query path, "
+        f"got {len(mcts.nodes)} nodes: {list(mcts.nodes)}"
+    )
+
+
 def test_direct_query_respects_mask():
     """Only arms {0, 2} exist; the prior [0.5, 0.3, 0.2] must be masked to
     [0.5, 0, 0.2] and renormalised to [5/7, 0, 2/7]."""
@@ -299,15 +363,21 @@ def test_direct_query_respects_mask():
 
 def test_rollout_multidim_action_space():
     """GridBanditGame has a MultiDiscrete action space, so _rollout_value
-    must step with np.unravel_index tuples. All cells reward 1.0, so both
-    rollouts return exactly 1.0 regardless of the sampled cell."""
+    must step with np.unravel_index tuples. A non-square 2x3 grid with a
+    single legal cell pins the flat→(r,c) mapping exactly: the only legal
+    flat index is 5, and unravel_index(5, (2, 3)) == (1, 2), the cell that
+    rewards 5.0. A transposed or swapped mapping yields (2, 1) or another
+    cell and trips GridBanditGame.step's bounds/mask asserts."""
     np.random.seed(1234)
-    game = GridBanditGame(np.ones((2, 2)))
-    net = UniformNet((2, 2), value=0.0)
+    game = GridBanditGame(
+        reward_grid=[[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]],
+        mask_grid=[[0, 0, 0], [0, 0, 1]],
+    )
+    net = UniformNet((2, 3), value=0.0)
     mcts = MCTS(game, net, n_simulations=0, rollout_n=2, rollout_blend=0.0)
 
     root = _expand_root(mcts)
-    assert float(root.nn_value) == 1.0, (
-        f"every 2x2 cell rewards 1.0, so the rollout mean must be exactly "
-        f"1.0, got {float(root.nn_value)}"
+    assert float(root.nn_value) == 5.0, (
+        f"the lone legal cell (1, 2) rewards 5.0, so both rollouts must "
+        f"return exactly 5.0, got nn_value={float(root.nn_value)}"
     )

@@ -17,13 +17,15 @@ Ten tests over the shared synthetic environments in ``tests/mcts_envs.py``:
 6.  truncation_treated_as_terminal — truncated=True episodes end the search
     exactly like terminated=True: terminal node, exact Q at the root.
 7.  total_N_invariant_across_envs — total_N == sum(action_N.values()) at
-    every nonterminal expanded node, across five different environments.
+    every node (terminal nodes pinned to total_N == 0, action_N == {}),
+    across five different environments.
 8.  game_state_restored_after_search — hashable_obs and step_count are
     identical before/after perform_simulations.
 9.  terminal_nodes_have_no_edges — terminal nodes carry direct_reward but
-    have empty action_N / action_Q.
+    have empty action_N / action_Q and total_N == 0.
 10. policy_original_untouched_without_noise — without Dirichlet noise,
-    nn_policy stays bitwise-equal to nn_policy_original.
+    nn_policy and nn_policy_original both equal the independently known
+    masked uniform prior and are distinct array objects (no aliasing).
 
 All searches here are deterministic (no noise, no rollouts), so no RNG
 seeding is required.
@@ -250,8 +252,10 @@ ENV_NET_CASES = [
 
 @pytest.mark.parametrize("game_factory, net_factory", ENV_NET_CASES)
 def test_total_N_invariant_across_envs(game_factory, net_factory):
-    """After ~100 sims in any environment, every nonterminal expanded node
-    satisfies total_N == sum(action_N.values()).
+    """After ~100 sims in any environment, every node — terminal or not,
+    expanded or not — satisfies total_N == sum(action_N.values()). Terminal
+    nodes are never backed up through, so on them the invariant is pinned
+    exactly: total_N == 0 and action_N == {}.
 
     Note: 'expanded' (nn_policy populated) counts only nonterminal nodes —
     one-step games (bandit, grid_bandit) expand exactly one node (the root),
@@ -263,16 +267,22 @@ def test_total_N_invariant_across_envs(game_factory, net_factory):
 
     expanded = 0
     for state, node in mcts.nodes.items():
-        if node.is_terminal_state:
-            continue  # terminal nodes carry no edges (see test 9)
-        if node.nn_policy is None:
-            continue  # reached but unexpanded — tolerate
-        expanded += 1
         sum_action_n = sum(node.action_N.values())
         assert node.total_N == sum_action_n, (
             f"node {state!r}: total_N={node.total_N} != "
             f"sum(action_N)={sum_action_n}"
         )
+        if node.is_terminal_state:
+            # Terminal nodes are never backed up through (see test 9).
+            assert node.total_N == 0, (
+                f"terminal node {state!r} has total_N={node.total_N}, "
+                f"expected 0"
+            )
+            assert node.action_N == {}, (
+                f"terminal node {state!r} has edges: action_N={node.action_N}"
+            )
+        elif node.nn_policy is not None:
+            expanded += 1
     assert expanded >= 1, "search should have expanded at least the root"
     assert len(mcts.nodes) >= 2, (
         f"search should have created >= 2 nodes, got {len(mcts.nodes)}"
@@ -333,6 +343,9 @@ def test_terminal_nodes_have_no_edges():
         assert node.action_Q == {}, (
             f"terminal {state!r} has edges: action_Q={node.action_Q}"
         )
+        assert node.total_N == 0, (
+            f"terminal {state!r} has total_N={node.total_N}, expected 0"
+        )
         assert node.direct_reward == rewards[k], (
             f"terminal {state!r}: direct_reward={node.direct_reward} != "
             f"{rewards[k]}"
@@ -346,7 +359,14 @@ def test_terminal_nodes_have_no_edges():
 
 def test_policy_original_untouched_without_noise():
     """A plain search (add_noise=False) never modifies nn_policy after
-    expansion, so it stays bitwise-equal to nn_policy_original."""
+    expansion, so it stays bitwise-equal to nn_policy_original.
+
+    Both fields are pinned against an independent ground truth — the root of
+    make_delayed_trap has 2 legal actions under UniformNet(2), so the masked
+    prior is exactly [0.5, 0.5] — and must be *distinct* array objects:
+    perform_simulations_reuse restores noise from nn_policy_original, which
+    only works if it is an independent snapshot rather than an alias of
+    nn_policy."""
     game = make_delayed_trap()
     net = UniformNet(2)
     mcts = MCTS(game, net, n_simulations=100)
@@ -354,6 +374,19 @@ def test_policy_original_untouched_without_noise():
 
     root = mcts.nodes["root"]
     assert root.nn_policy_original is not None, "root was never expanded"
+    assert root.nn_policy is not root.nn_policy_original, (
+        "nn_policy_original must be an independent snapshot, not an alias "
+        "of nn_policy"
+    )
+    expected = np.array([0.5, 0.5])
+    assert np.array_equal(root.nn_policy, expected), (
+        f"nn_policy {root.nn_policy} != expected masked uniform prior "
+        f"{expected}"
+    )
+    assert np.array_equal(root.nn_policy_original, expected), (
+        f"nn_policy_original {root.nn_policy_original} != expected masked "
+        f"uniform prior {expected}"
+    )
     assert np.array_equal(root.nn_policy, root.nn_policy_original), (
         f"nn_policy {root.nn_policy} diverged from original "
         f"{root.nn_policy_original} without noise"

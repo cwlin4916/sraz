@@ -5,3 +5,5 @@ __pycache__/
 experiments/
 checkpoints/
 .pytest_cache/
+.DS_Store
+repo_summary/

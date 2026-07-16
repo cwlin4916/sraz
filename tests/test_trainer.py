@@ -61,12 +61,16 @@ class _StubAgent:
         self.all_training_examples = []
         self.game = {"tag": "stub-game"}
         self.play_calls = 0
+        self.play_kwargs = []
 
     def _randseed(self, rng_name):
         return int(self.rngs[rng_name].integers(0, 2**31 - 1))
 
-    def play_for_experience(self, game, i, reset_seed, interaction_seed):
+    def play_for_experience(self, game, i, reset_seed, interaction_seed,
+                            add_noise=True, temperature_override=None):
         self.play_calls += 1
+        self.play_kwargs.append({"add_noise": add_noise,
+                                 "temperature_override": temperature_override})
         reward = float(self.rewards[i % len(self.rewards)])
         experience = [(np.zeros(3), p.copy(), reward) for p in self.policies]
         step_infos = [{"step": k} for k in range(len(self.policies))]
@@ -75,7 +79,8 @@ class _StubAgent:
 
 
 class _ExplodingAgent(_StubAgent):
-    def play_for_experience(self, game, i, reset_seed, interaction_seed):
+    def play_for_experience(self, game, i, reset_seed, interaction_seed,
+                            add_noise=True, temperature_override=None):
         raise RuntimeError("boom")
 
 
@@ -195,12 +200,15 @@ def test_collect_uses_tree_reuse_play_fn_when_enabled(tmp_path):
             self.reuse_calls = 0
 
         def play_for_experience_reuse_tree(self, game, i, reset_seed,
-                                           interaction_seed):
+                                           interaction_seed, add_noise=True,
+                                           temperature_override=None):
             self.reuse_calls += 1
             return _StubAgent.play_for_experience(
-                self, game, i, reset_seed, interaction_seed)
+                self, game, i, reset_seed, interaction_seed,
+                add_noise=add_noise, temperature_override=temperature_override)
 
-        def play_for_experience(self, game, i, reset_seed, interaction_seed):
+        def play_for_experience(self, game, i, reset_seed, interaction_seed,
+                                add_noise=True, temperature_override=None):
             raise AssertionError("plain play_for_experience must not be used")
 
     trainer, agent, _ = _stub_trainer(tmp_path, n_games=2,

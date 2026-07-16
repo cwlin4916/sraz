@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sraz.instances.symreg.game import SymRegGame
 from sraz.instances.symreg.network import SymRegPolicyValueNet
 from sraz.core.agent import Agent
+from sraz.core.policy_value_net import UniformPolicyValueNet
 from sraz.training.trainer import Trainer
 
 from sraz.core.config import (
@@ -30,6 +31,8 @@ class SymRegConfig(MetaConfig):
                 "max_len": 15,
                 "redraw_constants": False,
                 "problem_seed": 0,
+                "target": None,
+                "lmfit_max_nfev": None,
             },
         )
         self.net = NetConfig(
@@ -41,6 +44,7 @@ class SymRegConfig(MetaConfig):
                 "n_simulations": 25,
                 "temperature": 1.0,
                 "c_exploration": 1.0,
+                "backup_rule": "mean",
             },
             reward_discount=1.0,
             random_seeds={
@@ -65,15 +69,31 @@ class SymRegConfig(MetaConfig):
             plot_path="symreg_training_metrics.png",
         )
 
+    def use_uniform_net(self, value: float = 0.0) -> "SymRegConfig":
+        """Swap the learned net for a uniform prior with constant value.
+
+        Turns the run into pure UCT: `build` still returns a Trainer, and its
+        iterations still batch self-play games, but `train` is a no-op, so
+        nothing carries from one iteration to the next.
+        """
+        self.net = NetConfig(net_cls=UniformPolicyValueNet, kwargs={"value": value})
+        return self
+
     def build(self):
         """Build symreg game, network, agent, and trainer (no evaluator in v1)."""
         game = SymRegGame(**self.game.kwargs)
-        net_kwargs = {
-            "state_len": game.state_len,
-            "n_tokens": game.grammar.nsym + 1,
-            "n_actions": game.state_len * game.grammar.nprods,
-        } | self.net.kwargs
-        net = SymRegPolicyValueNet(**net_kwargs)
+        n_actions = game.state_len * game.grammar.nprods
+
+        if self.net.net_cls is UniformPolicyValueNet:
+            net = UniformPolicyValueNet(n_actions=n_actions, **self.net.kwargs)
+        else:
+            net_kwargs = {
+                "state_len": game.state_len,
+                "n_tokens": game.grammar.nsym + 1,
+                "n_actions": n_actions,
+            } | self.net.kwargs
+            net = SymRegPolicyValueNet(**net_kwargs)
+
         agent = Agent(
             game=game,
             net=net,
@@ -90,5 +110,7 @@ class SymRegConfig(MetaConfig):
             n_past_iterations_to_train=self.trainer.n_past_iterations_to_train,
             n_procs=self.trainer.n_procs,
             checkpoint_dir=self.trainer.checkpoint_dir,
+            self_play_add_noise=self.trainer.self_play_add_noise,
+            self_play_temperature=self.trainer.self_play_temperature,
         )
         return game, net, agent, trainer
