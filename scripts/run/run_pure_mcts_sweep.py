@@ -11,7 +11,7 @@ so the emitted expression is a function of the simulation budget and the
 rollout draws alone. Nothing carries across episodes -- there is no trainer
 here on purpose. With the network disabled an "iteration" would batch episodes
 without propagating anything, so this driver calls `greedy_episode` directly
-(the same choice `docs/notes/figures/rollout_experiments.json` records).
+(the same choice `Claude-research/figures/rollout_experiments.json` records).
 
 Determinism. `rollout_n = 0` consults no RNG at all and would make every
 episode identical (tests/test_uct_pure_search.py). Rollouts are the *only*
@@ -182,7 +182,7 @@ def parse_args():
     p.add_argument("--n-simulations", nargs="+", type=int, default=list(N_SIMULATIONS))
     p.add_argument("--n-episodes", type=int, default=N_EPISODES)
     p.add_argument("--out", type=str,
-                   default="docs/notes/figures/pure_mcts_sweep.json")
+                   default="Claude-research/figures/pure_mcts_sweep.json")
     return p.parse_args()
 
 

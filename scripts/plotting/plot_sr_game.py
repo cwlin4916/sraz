@@ -1,4 +1,4 @@
-"""Figure for docs/notes/01.md — symbolic regression as a grammar game.
+"""Figure for Claude-research/notes/01-game-spec.md — symbolic regression as a grammar game.
 
 Produces one PNG by replaying the REAL environment
 (`sraz.instances.symreg.game.SymRegGame`); nothing is hand-transcribed:
@@ -205,7 +205,7 @@ def main() -> int:
         description=__doc__.splitlines()[0],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--out-dir", type=Path,
-                        default=REPO_ROOT / "docs" / "notes" / "figures",
+                        default=REPO_ROOT / "Claude-research" / "figures",
                         help="Where to write the PNG.")
     parser.add_argument("--problem-seed", type=int, default=PROBLEM_SEED,
                         help="Seed fixing the target constants C*.")

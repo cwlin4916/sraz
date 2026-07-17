@@ -7,3 +7,5 @@ checkpoints/
 .pytest_cache/
 .DS_Store
 repo_summary/
+# Intermediate GIF frames (assembled into the final .gif by plot_mcts_tree_gif.py)
+**/_frames_*/

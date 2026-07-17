@@ -56,7 +56,7 @@ PANEL_TITLE = {
     "quad_B": "A2   quad_B:  $y = 6 - 5x + 0.5x^2$   (deceptive)",
 }
 
-# Reachable scores worth drawing as references (docs/notes/02.md section 1.3).
+# Reachable scores worth drawing as references (Claude-research/notes/02-target-families.md section 1.3).
 # quad_B's 5-token linear cheat scores 0.9972 -- 0.003 from the exact 1.0, and
 # so indistinguishable on a linear axis. It is deliberately NOT drawn as a
 # separate line: two labels on one pixel would imply a resolution this axis does
@@ -167,8 +167,8 @@ def draw_root(ax, data, target):
 
 def main():
     p = argparse.ArgumentParser(description="Figure: pure MCTS R^2 vs budget")
-    p.add_argument("--data", default="docs/notes/figures/pure_mcts_targets.json")
-    p.add_argument("--out", default="docs/notes/figures/pure_mcts_targets.png")
+    p.add_argument("--data", default="Claude-research/figures/pure_mcts_targets.json")
+    p.add_argument("--out", default="Claude-research/figures/pure_mcts_targets.png")
     args = p.parse_args()
 
     with open(args.data) as f:

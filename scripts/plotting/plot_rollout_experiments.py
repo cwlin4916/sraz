@@ -179,8 +179,8 @@ def plot_rollout_sparsity(data, out: Path):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--data", type=Path,
-                   default=Path("docs/notes/figures/rollout_experiments.json"))
-    p.add_argument("--out-dir", type=Path, default=Path("docs/notes/figures"))
+                   default=Path("Claude-research/figures/rollout_experiments.json"))
+    p.add_argument("--out-dir", type=Path, default=Path("Claude-research/figures"))
     a = p.parse_args()
 
     data = json.loads(a.data.read_text())

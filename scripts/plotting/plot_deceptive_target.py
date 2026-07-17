@@ -128,7 +128,7 @@ def plot_deceptive_target(out: Path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out-dir", type=Path, default=Path("docs/notes/figures"))
+    ap.add_argument("--out-dir", type=Path, default=Path("Claude-research/figures"))
     a = ap.parse_args()
     a.out_dir.mkdir(parents=True, exist_ok=True)
     plot_deceptive_target(a.out_dir / "mcts_deceptive_target.png")

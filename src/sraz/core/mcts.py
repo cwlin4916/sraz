@@ -92,7 +92,7 @@ class MCTS():
         # object self-contained and, crucially, never touches the process-global
         # np.random -- which the driver does not seed and which fork-based
         # multiprocessing workers would otherwise share (drawing identical
-        # noise across self-play games). See docs/notes and Claude-reviews.
+        # noise across self-play games). See Claude-research/notes and Claude-reviews.
         self.rng = rng if rng is not None else np.random.default_rng()
 
         # min max Q value

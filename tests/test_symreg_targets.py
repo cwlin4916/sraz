@@ -357,21 +357,26 @@ def test_documented_token_counts():
 
 XS_SYM = np.linspace(-1.0, 1.0, 41)
 MEAN_X2 = float(np.mean(XS_SYM ** 2))                     # 0.35, exactly
+MEAN_X4 = float(np.mean(XS_SYM ** 4))                     # 0.220325, exactly
 KAPPA = float(np.sum((XS_SYM ** 2 - MEAN_X2) ** 2)
               / (4 * np.sum(XS_SYM ** 2)))                # 0.069875, exactly
+KAPPA2 = (1.0 - MEAN_X2 ** 2 / MEAN_X4) / MEAN_X2         # 1.2685805..., exactly
 
 
 def test_the_grid_constants_are_the_values_the_figures_hardcode():
-    """The closed forms are only closed because these two numbers are exact."""
+    """The closed forms are only closed because these numbers are exact."""
     assert MEAN_X2 == pytest.approx(0.35, abs=1e-12)
+    assert MEAN_X4 == pytest.approx(0.220325, abs=1e-12)
     assert KAPPA == pytest.approx(0.069875, abs=1e-12)
+    assert KAPPA2 == pytest.approx(1.269, abs=5e-4)
 
 
 def test_linear_score_is_a_closed_form_in_the_root():
     """R^2 of the 3-token '* C1 x' is clip(1 - rho^2/<x^2>), rho = |c0/c1|.
 
-    This is the whole varying content of the linear family's ladder column, and
-    it is the curve panel B of the linear figure draws.
+    One of the two curves that move in figure 1b. With no free constant, the
+    structure pays for c0 out of its residual; x _|_ 1 on the symmetric grid
+    fixes the slope at c1, so the residual is exactly c0.
     """
     for name, t in LINEAR_TARGETS.items():
         c0, c1 = t.coeffs
@@ -381,11 +386,62 @@ def test_linear_score_is_a_closed_form_in_the_root():
         assert measured == pytest.approx(predicted, abs=1e-6), name
 
 
+def test_quadratic_term_score_is_also_a_closed_form_in_the_root():
+    """R^2 of the 5-token '* C2 * x x' is clip(-kappa2 * rho^2).
+
+    The linear family's *second* moving row, and the other curve figure 1b
+    draws. It is intercept-free too, so rho enters the same way -- but it pays
+    twice: x is odd and x^2 even, so the odd component of the target is
+    unreachable as well. Hence the score is <= 0 for every rho, and 0 only at
+    rho = 0, where it is merely useless rather than harmful.
+    """
+    for name, t in LINEAR_TARGETS.items():
+        c0, c1 = t.coeffs
+        rho = abs(c0 / c1)
+        predicted = float(np.clip(-KAPPA2 * rho ** 2, -1, 1))
+        measured = fit_expression("* C2 * x x", t.xs(), t.ys(t.xs()))
+        assert measured == pytest.approx(predicted, abs=1e-6), name
+
+
+def test_a_free_constant_is_exactly_what_makes_a_ladder_row_flat():
+    """The rule figure 1b is organised by, asserted rather than listed.
+
+    A structure carrying a free C0 absorbs c0 whatever it is, so its R^2 cannot
+    depend on rho at all; a structure without one must pay for c0 out of its
+    residual, so rho enters. Sweep rho at fixed c1 and check which rows move.
+    This is why exactly two of the seven rows are curves and five are flat.
+    """
+    rhos = [0.0, 0.1, 0.25, 0.5]
+    for rule in ("C0", "+ * C1 x C0", "+ * C2 * x x C0",
+                 "+ C0 + * C1 x * C2 * x x"):
+        vals = [fit_expression(rule, XS_SYM, r + XS_SYM) for r in rhos]
+        assert max(vals) - min(vals) < 1e-6, f"{rule} has an intercept but moved"
+    for rule in ("* C1 x", "* C2 * x x"):
+        vals = [fit_expression(rule, XS_SYM, r + XS_SYM) for r in rhos]
+        assert max(vals) - min(vals) > 0.1, f"{rule} is intercept-free but did not move"
+
+
+def test_the_three_crossings_figure_1b_labels():
+    """The curves' landmarks, all three inside the domain -- which is the point:
+    the reward stops discriminating before the root has even left [-1, 1]."""
+    assert np.sqrt(MEAN_X2) == pytest.approx(0.592, abs=5e-4)       # C1x hits 0
+    assert np.sqrt(2 * MEAN_X2) == pytest.approx(0.837, abs=5e-4)   # C1x floors
+    assert 1 / np.sqrt(KAPPA2) == pytest.approx(0.888, abs=5e-4)    # C2x^2 floors
+    assert max(np.sqrt(2 * MEAN_X2), 1 / np.sqrt(KAPPA2)) < 1.0     # all inside
+    assert fit_expression("* C1 x", XS_SYM, np.sqrt(MEAN_X2) + XS_SYM) == \
+        pytest.approx(0.0, abs=1e-6)
+    assert fit_expression("* C1 x", XS_SYM, np.sqrt(2 * MEAN_X2) + XS_SYM) == \
+        pytest.approx(-1.0, abs=1e-6)
+    assert fit_expression("* C2 * x x", XS_SYM, (1 / np.sqrt(KAPPA2)) + XS_SYM) == \
+        pytest.approx(-1.0, abs=1e-6)
+
+
 def test_the_other_linear_ladder_rows_are_constant_across_the_family():
     """Only the intercept-free rows vary with the root; the rest are flat.
 
-    Panel B of the linear figure draws one curve and claims it carries
-    everything. That claim is only honest if the other rows really are constant.
+    Figure 1b draws five flat rows and two curves. That split is only honest if
+    these four really are constant down the whole column (the fifth flat row,
+    the sinusoid, is a measured fit failure and is pinned separately).
     """
     for rule, expected in (("C0", 0.0),
                            ("+ * C1 x C0", 1.0),
@@ -396,10 +452,23 @@ def test_the_other_linear_ladder_rows_are_constant_across_the_family():
             assert got == pytest.approx(expected, abs=1e-6), f"{rule} on {name}"
 
 
+def test_the_sinusoid_row_is_a_measured_failure_not_a_closed_form():
+    """Figure 1b draws six curves as exact arithmetic and one as measured. The
+    sinusoid is the exception because C4 is the one constant in this grammar
+    that its structure is *nonlinear* in: every other candidate is linear
+    least-squares in disguise and fits regardless of scale, while this one
+    stalls under the cap and returns the clip floor. The -1 is a property of the
+    oracle, not of the structure.
+    """
+    for name, t in LINEAR_TARGETS.items():
+        got = fit_expression("* C3 sin * C4 x", t.xs(), t.ys(t.xs()), max_nfev=50)
+        assert got == pytest.approx(-1.0, abs=1e-9), name
+
+
 def test_quadratic_two_term_rows_are_a_closed_form_in_the_vertex():
     """R^2 of '+ * C1 x C0' is lambda = x_v^2/(x_v^2+kappa), and R^2 of
     '+ * C2 * x x C0' is 1 - lambda. One number per target, set by the vertex
-    alone -- the two curves panel B of the quadratic figure draws."""
+    alone -- the two curves figure 2b's panel A draws."""
     for name, t in QUADRATIC_TARGETS.items():
         lam = t.vertex ** 2 / (t.vertex ** 2 + KAPPA)
         lin = fit_expression("+ * C1 x C0", t.xs(), t.ys(t.xs()))
@@ -425,6 +494,122 @@ def test_quad_B_trap_depth_is_lambda_of_its_vertex():
     lam = 25.0 / (25.0 + KAPPA)
     assert lam == pytest.approx(0.9972, abs=5e-5)
     assert fit_expression("+ * C1 x C0", t.xs(), t.ys(t.xs())) == pytest.approx(lam, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Figure 2b: the quadratic family needs TWO coordinates, not one
+#
+# The linear family has one reward-visible degree of freedom, so figure 1b puts
+# all seven rows on a single rho axis. This family has two. The seam is the same
+# one -- whether the structure carries a free C0 -- with the two sets swapped:
+# here the intercept-carrying rows are the ones the vertex settles, and the two
+# without an intercept must also pay for an offset the vertex cannot see.
+# ---------------------------------------------------------------------------
+
+KAPPA2_M2 = KAPPA2 * MEAN_X2                              # 0.444003..., exactly
+
+
+def reward_coords(c0, c1, c2):
+    """(lambda, omega, omega0): a target's reward-visible coordinates.
+
+    Mirrors reward_coords() in scripts/plotting/plot_target_families.py. lambda
+    is the linear share of the variance; omega = ybar/s and omega0 = c0/s are
+    the mean and the intercept in units of the target's own spread, which is
+    what makes them scale-free. Lines and parabolas alike -- a line is lambda=1.
+    """
+    y = c0 + c1 * XS_SYM + c2 * XS_SYM ** 2
+    s = float(np.sqrt(np.mean((y - y.mean()) ** 2)))
+    var_x2 = MEAN_X4 - MEAN_X2 ** 2
+    lam = c1 ** 2 * MEAN_X2 / (c1 ** 2 * MEAN_X2 + c2 ** 2 * var_x2)
+    return lam, float(y.mean()) / s, c0 / s
+
+
+def predicted_intercept_free(lam, omega, omega0):
+    """What figure 2b's panel B claims the two intercept-free rows score."""
+    return (float(np.clip(lam - omega ** 2, -1.0, 1.0)),
+            float(np.clip((1.0 - lam) - KAPPA2_M2 * omega0 ** 2, -1.0, 1.0)))
+
+
+def test_the_rate_figure_2b_hardcodes_is_exact():
+    """0.444 is the fraction of the intercept `* C2 * x x` still pays after x^2
+    has absorbed what it can. `* C1 x` pays the whole thing, at a rate of 1."""
+    assert KAPPA2_M2 == pytest.approx(0.444, abs=5e-4)
+
+
+def test_the_vertex_alone_does_not_settle_the_intercept_free_rows():
+    """Why figure 2b needs two panels where figure 1b needed one axis.
+
+    Hold the vertex fixed and move the offset. The rows WITH a free C0 do not
+    budge -- the constant absorbs c0, whatever it is -- while the two without
+    one swing across most of the reward's range. Drawing those two against |x_v|
+    would assert a function that does not exist.
+    """
+    settled, moved = [], []
+    for c0 in (0.0, 0.5, 1.0, 3.0, 10.0):
+        ys = c0 - 0.5 * XS_SYM + XS_SYM ** 2      # x_v = -c1/2c2 = 0.25 throughout
+        settled.append(fit_expression("+ * C1 x C0", XS_SYM, ys))
+        moved.append(fit_expression("* C1 x", XS_SYM, ys))
+    lam = 0.25 ** 2 / (0.25 ** 2 + KAPPA)
+    assert settled == pytest.approx([lam] * 5, abs=1e-6)
+    assert max(moved) - min(moved) > 0.8
+
+
+def test_intercept_free_rows_are_a_closed_form_in_the_normalized_offset():
+    """The law figure 2b's panel B draws, on every member of BOTH families:
+
+        R^2(`* C1 x`)     = clip(lambda - omega^2)
+        R^2(`* C2 * x x`) = clip((1-lambda) - kappa2<x^2> * omega0^2)
+
+    Read against panel A -- where lambda is exactly what `+ * C1 x C0` scores
+    and 1-lambda what `+ * C2 * x x C0` scores -- each line says the same thing:
+    a row without an intercept scores what its counterpart scores, minus a
+    quadratic in the normalized offset. That is why the second coordinate costs
+    a panel and not a curve family: it enters through the offset and nowhere
+    else.
+    """
+    for name, t in TARGETS.items():
+        c0, c1, c2 = (list(t.coeffs) + [0.0, 0.0, 0.0])[:3]
+        assert t.xs() == pytest.approx(XS_SYM), name   # the closed forms need this grid
+        want_lin, want_quad = predicted_intercept_free(*reward_coords(c0, c1, c2))
+        ys = t.ys(t.xs())
+        assert fit_expression("* C1 x", t.xs(), ys) == pytest.approx(want_lin, abs=1e-6), name
+        assert fit_expression("* C2 * x x", t.xs(), ys) == pytest.approx(want_quad, abs=1e-6), name
+
+
+def test_figure_1b_is_the_lambda_equals_one_slice_of_figure_2b():
+    """The two figures draw ONE law, not two. A line is lambda = 1, and there
+    the panel-B laws collapse to figure 1b's two falling curves exactly:
+    omega^2 = rho^2/<x^2> and kappa2<x^2>*omega0^2 = kappa2*rho^2."""
+    for name, t in LINEAR_TARGETS.items():
+        c0, c1 = t.coeffs
+        rho = abs(c0 / c1)
+        lam, omega, omega0 = reward_coords(c0, c1, 0.0)
+        assert lam == pytest.approx(1.0, abs=1e-12), name
+        assert omega ** 2 == pytest.approx(rho ** 2 / MEAN_X2, rel=1e-9), name
+        assert KAPPA2_M2 * omega0 ** 2 == pytest.approx(KAPPA2 * rho ** 2, rel=1e-9), name
+        # ...which is to say: figure 1b's closed forms, recovered from 2b's.
+        want_lin, want_quad = predicted_intercept_free(lam, omega, omega0)
+        assert want_lin == pytest.approx(np.clip(1 - rho ** 2 / MEAN_X2, -1, 1), abs=1e-9), name
+        assert want_quad == pytest.approx(np.clip(-KAPPA2 * rho ** 2, -1, 1), abs=1e-9), name
+
+
+def test_the_law_holds_away_from_the_eight_designed_members():
+    """Not an artifact of the coefficients section 1 happens to choose: random
+    lines and parabolas obey it too."""
+    rng = np.random.default_rng(0)
+    checked = 0
+    for _ in range(120):
+        c0, c1, c2 = rng.normal(0.0, 3.0, 3)
+        if rng.random() < 0.2:
+            c2 = 0.0                                   # keep some pure lines in the draw
+        if abs(c1) < 1e-6 and abs(c2) < 1e-6:
+            continue                                   # a constant has no variance to share
+        ys = c0 + c1 * XS_SYM + c2 * XS_SYM ** 2
+        want_lin, want_quad = predicted_intercept_free(*reward_coords(c0, c1, c2))
+        assert fit_expression("* C1 x", XS_SYM, ys) == pytest.approx(want_lin, abs=1e-6)
+        assert fit_expression("* C2 * x x", XS_SYM, ys) == pytest.approx(want_quad, abs=1e-6)
+        checked += 1
+    assert checked > 100
 
 
 def test_reward_is_invariant_to_rescaling_but_not_to_shifting():

@@ -14,7 +14,7 @@
 
 ## Introduction
 
-1. This note specifies symbolic regression as a single-player grammar game: what the state, actions, and legality mask are; how the terminal reward scores an emitted expression; and one worked episode replayed through the real environment. Training runs on the game are documented in the [second note](02_training_run.md).
+1. This note specifies symbolic regression as a single-player grammar game: what the state, actions, and legality mask are; how the terminal reward scores an emitted expression; and one worked episode replayed through the real environment. Training runs on the game are documented in the [second note](02-target-families.md).
 2. The game is context-free derivation as an MDP: a 15-slot token buffer holds the current sentential form, and each action rewrites one nonterminal with one production (§1).
 3. The grammar offers four primitives — a constant, a linear term, a quadratic term, and a sinusoid — combined by $\{+,*,/\}$; the agent chooses only the *structure*, the constants $C_k$ remain symbols (§2).
 4. At termination the constants are fitted by least squares against the target data; the reward is the $R^2$ of the fit, clipped to $[-1,1]$ (§3).
@@ -34,7 +34,7 @@ at 41 equispaced points $x_n \in [1,3]$.
 
 The $C^*$ are drawn once at construction from the problem seed and then **fixed**: the same expression scores identically across episodes. Per-episode resampling — fresh $C^*$ every reset, the original stochastic behavior — is opt-in.
 
-This note's instance is problem seed 42, whose constants are $$\boxed{C_0^* = 3.322, \quad C_1^* = 2.317, \quad C_2^* = 3.576}$$. The training driver reuses its run seed as the problem seed, so the seed-42 run in the [second note](02_training_run.md) plays this same instance.
+This note's instance is problem seed 42, whose constants are $$\boxed{C_0^* = 3.322, \quad C_1^* = 2.317, \quad C_2^* = 3.576}$$. The training driver reuses its run seed as the problem seed, so the seed-42 run in the [second note](02-target-families.md) plays this same instance.
 
 | Symbol | Plain-English meaning | Formula / value | Why it matters |
 |---|---|---|---|
@@ -123,7 +123,7 @@ A scripted, mask-legal 5-action episode on the seed-42 instance, replayed throug
 
 > **What this figure shows:** the 15-slot buffer being rewritten production-by-production until no nonterminal remains — ending exactly at the 14-token cap — then the terminal constant-fit that scores the emitted structure against the 41 target points.
 
-![One scripted episode of the SR grammar game](figures/sr_game_progression.png)
+![One scripted episode of the SR grammar game](../figures/sr_game_progression.png)
 
 **Figure 1: Symbolic regression as a grammar game — one scripted episode.** *Read.* Panel A: the derivation grows left to right, one action per row, and terminates once the fifth action removes the last nonterminal, filling 14 of the 15 slots. Panel B: the target points rise steeply and near-linearly while the fitted curve tracks the trend but smooths out the sinusoidal wiggle, since the sine frequency is mis-fitted.
 
@@ -166,14 +166,14 @@ All game code lives in `src/sraz/`; Figures 1–2 are produced by the scripts be
 | MCTS stash/unstash | [game.py:272-293](../../src/sraz/instances/symreg/game.py#L272-L293) |
 | Engine Game ABC (`reset_wrapper`/`step_wrapper`/`clone`) | [core/game.py:67-108](../../src/sraz/core/game.py#L67-L108) |
 | SR hyperparameter defaults | [config.py](../../src/sraz/instances/symreg/config.py) |
-| Contract test replaying the worked episode | [test_grammar_env.py:58-72](../../tests/test_grammar_env.py#L58-L72) |
+| Contract test replaying the worked episode | [test_game_grammar.py:58-72](../../tests/instances/symreg/test_game_grammar.py#L58-L72) |
 | Regression test pinning this note's ladder | [test_symreg_targets.py](../../tests/test_symreg_targets.py) |
 | Figure 1 driver | [plot_sr_game.py](../../scripts/plotting/plot_sr_game.py) |
 
 ## Appendix: Reproduce
 
 ```bash
-# from repo root; writes docs/notes/figures/sr_game_progression.png (Figure 1)
+# from repo root; writes Claude-research/figures/sr_game_progression.png (Figure 1)
 python scripts/plotting/plot_sr_game.py
 
 # re-measure this note's score ladder and problem instance
@@ -181,5 +181,5 @@ python -m pytest tests/test_symreg_targets.py -k "default_game_is_untouched or d
 ```
 
 Training runs on this game — the learned baseline that used to sit in this note,
-and the pure-search target families — are in the [second note](02_training_run.md),
+and the pure-search target families — are in the [second note](02-target-families.md),
 which also defines the greedy $R^2$ those runs are scored by.

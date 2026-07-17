@@ -420,7 +420,7 @@ def plot(sim: dict, idx: int, seed: int, out: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--out-dir", type=Path, default=Path("docs/notes/figures"))
+    p.add_argument("--out-dir", type=Path, default=Path("Claude-research/figures"))
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--sim-index", type=int, default=None)
     a = p.parse_args()

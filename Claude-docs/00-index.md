@@ -15,7 +15,7 @@ iteration snapshot.
 ## Relationship to the repo's own docs
 
 - `README.md` — install/run quickstart and layout.
-- `docs/notes/01.md` — the **authoritative, math-heavy specification** of the SR
+- `Claude-research/notes/01-game-spec.md` — the **authoritative, math-heavy specification** of the SR
   game plus the first documented training run (seed 42). It is the source of
   truth for the *game*; these Claude-docs concentrate on the *engine internals*
   and a code-level map, and defer to `01.md` for the formal MDP definition.
@@ -23,7 +23,7 @@ iteration snapshot.
 ## Caveat noted during the read-through
 
 `src/sraz/core/mcts.py:95` references `docs/notes/stage4/03.md` ("Core MCTS
-audit findings"), but only `docs/notes/01.md` exists in this commit. The
+audit findings"), but only `Claude-research/notes/01-game-spec.md` exists in this commit. The
 referenced note appears to be from the upstream project (`AlphaZero_PP`) and was
 not ported. The `self.debug_state` instrumentation it documents *is* present in
 the code (see [04-mcts-internals](04-mcts-internals.md)).

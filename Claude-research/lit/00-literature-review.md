@@ -202,7 +202,7 @@ Repo features this note attributes to the literature, with their implementations
 | Fit cache (deterministic reward) | [game.py:262-265](../../src/sraz/instances/symreg/game.py#L262-L265) |
 | PUCT, Dirichlet noise, min-max $Q$, backup rules | [mcts.py](../../src/sraz/core/mcts.py) |
 | Self-play → replay window → train loop | [trainer.py](../../src/sraz/training/trainer.py) |
-| Documented baseline run and collapse | [01.md §6](../notes/01.md#6-first-training-run-seed-42-figure-2) |
+| Documented baseline run and collapse | [01.md §6](../notes/01-game-spec.md) |
 
 ## Appendix: Method
 
