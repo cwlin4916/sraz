@@ -156,11 +156,18 @@ def target_ys_additive(xs: np.ndarray, constants: dict[str, float]) -> np.ndarra
     return (constants["C0"] + constants["C1"] * xs + constants["C2"] * xs ** 2)
 
 
-def fit_expression(rule: str, xs: np.ndarray, exact_ys: np.ndarray) -> float:
+def fit_expression(rule: str, xs: np.ndarray, exact_ys: np.ndarray,
+                   max_nfev: int | None = None) -> float:
     """Fit the C* constants of a prefix expression to the data; return clipped R².
 
     Any failure (unparseable expression, failed lmfit solve, non-finite result)
     yields -1.0 rather than raising — the original crashed on those paths.
+
+    `max_nfev` caps the inner Levenberg-Marquardt objective evaluations. None
+    leaves lmfit's own default (effectively unbounded for these models). A cap
+    turns a stalled fit into a low score rather than a long wait, so it is a
+    property of the *oracle*, not of the structure being scored: the same
+    sentence can score differently under different caps.
     """
     r2 = -1.0
     try:
@@ -177,7 +184,8 @@ def fit_expression(rule: str, xs: np.ndarray, exact_ys: np.ndarray) -> float:
         model = sympy_parser.parse_expr(infix, evaluate=False)
         fn = sympy.lambdify(list(model.free_symbols), model)
         lm_mod = lmfit.Model(fn, independent_vars=ind_vars)
-        res = lm_mod.fit(data=exact_ys, **param_values)
+        fit_kwargs = {} if max_nfev is None else {"max_nfev": max_nfev}
+        res = lm_mod.fit(data=exact_ys, **param_values, **fit_kwargs)
         if res.success:
             ss_res = np.sum((res.data - res.best_fit) ** 2)
             ss_tot = np.sum((res.data - np.mean(res.data)) ** 2)
@@ -207,6 +215,8 @@ class SymRegGame(Game[np.ndarray, int]):
 
     def __init__(self, max_len: int = 15, redraw_constants: bool = False,
                  problem_seed: int = 0,
+                 target: "Target | str | None" = None,
+                 lmfit_max_nfev: int | None = None,
                  grammar_rules: dict | None = None,
                  target_ys_fn=None,
                  constant_names: tuple | None = None,
@@ -228,10 +238,44 @@ class SymRegGame(Game[np.ndarray, int]):
 
         self.redraw_constants = redraw_constants
         self.problem_seed = problem_seed
-        self.xs = np.linspace(x_min, x_max, n_x)
-        self._redraw_rng = np.random.default_rng(problem_seed)
-        self.constants = self._draw_constants(np.random.default_rng(problem_seed))
-        self.exact_ys = self._target_ys_fn(self.xs, self.constants)
+        self.lmfit_max_nfev = lmfit_max_nfev
+
+        if isinstance(target, str):
+            from sraz.instances.symreg.targets import get_target
+            target = get_target(target)
+        self.target = target
+
+        if target is None:
+            # Parameterized instance: (grammar, target fn, domain) all default to
+            # the sine instance, so the shipped game is unchanged and earlier
+            # notes stay reproducible.
+            self.xs = np.linspace(x_min, x_max, n_x)
+            self._redraw_rng = np.random.default_rng(problem_seed)
+            self.constants = self._draw_constants(np.random.default_rng(problem_seed))
+            self.exact_ys = self._target_ys_fn(self.xs, self.constants)
+        else:
+            # A named target fixes both the function and its grid, so there is
+            # nothing left for a seed to draw and redrawing is meaningless.
+            # target.xs() is authoritative: x_min/x_max/n_x do not apply here.
+            if redraw_constants:
+                raise ValueError(
+                    "redraw_constants=True is incompatible with a fixed target: "
+                    f"{target.name}'s coefficients are chosen, not sampled."
+                )
+            if target_ys_fn is not None:
+                raise ValueError(
+                    "target_ys_fn is incompatible with a fixed target: "
+                    f"{target.name} supplies its own ys."
+                )
+            if target_infix is None:
+                # The runners print target_infix as the ground truth; the sine
+                # default would be a lie for a fixed target.
+                self.target_infix = target.infix
+            self._redraw_rng = np.random.default_rng(problem_seed)
+            self.xs = target.xs()
+            self.constants = {f"c{i}": c for i, c in enumerate(target.coeffs)}
+            self.exact_ys = target.ys(self.xs)
+
         self._fit_cache: dict[str, float] = {}
 
         self.state = None
@@ -300,7 +344,8 @@ class SymRegGame(Game[np.ndarray, int]):
 
     def _fit_cached(self, rule: str) -> float:
         if rule not in self._fit_cache:
-            self._fit_cache[rule] = fit_expression(rule, self.xs, self.exact_ys)
+            self._fit_cache[rule] = fit_expression(
+                rule, self.xs, self.exact_ys, max_nfev=self.lmfit_max_nfev)
         return self._fit_cache[rule]
 
     # MCTS stashes/unstashes once per simulation; the default deepcopy(self)

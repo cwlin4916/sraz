@@ -83,13 +83,13 @@ The problem is deliberately **nontrivial**: the token buffer caps expressions at
 14-token frontier scores $R^2 \approx 0.9873$). Reward is sparse (terminal only)
 and the inner constant-fit is nonconvex.
 
-See `docs/notes/01.md` for the authoritative, math-heavy specification of the
+See `Claude-research/notes/01-game-spec.md` for the authoritative, math-heavy specification of the
 game, a worked episode, and the first training run. This `Claude-docs/` folder
 focuses instead on the **engine internals** and a **file-by-file map**.
 
 ## Status of the project
 
-Per `docs/notes/01.md` §6, the first training run (seed 42, default
+Per `Claude-research/notes/01-game-spec.md` §6, the first training run (seed 42, default
 hyperparameters) **converges prematurely** to the one-action expression $C_1 x$
 at $R^2 = 0.8729$ and never escapes — a documented baseline, not a success. The
 MCTS code contains scaffolding (nonterminal rollouts, alternative backup rules,

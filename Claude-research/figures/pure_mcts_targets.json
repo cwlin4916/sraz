@@ -1,0 +1,849 @@
+{
+ "_provenance": {
+  "what": "Greedy R^2 vs MCTS simulation budget on lin_D, quad_B, pure MCTS: network disabled (uniform prior, value 0.0), leaf value = mean of 5 random rollouts, Dirichlet noise off, tau=0.0 at selection, backup_rule=mean, c_exploration=1.0, lmfit_max_nfev=50.",
+  "why_no_trainer": "With the network disabled nothing is learned, so an episode is a pure function of (n_simulations, rollout draws). Training iterations cannot move it; this driver calls greedy_episode directly.",
+  "determinism": "rollout_n>0 draws from the GLOBAL numpy RNG (mcts.py:322 uses np.random.randint, not a seeded stream), so each episode is pinned by np.random.seed(1234 + episode_index) and by nothing else.",
+  "reproduce": "python scripts/run/run_pure_mcts_sweep.py"
+ },
+ "hyperparameters": {
+  "targets": [
+   "lin_D",
+   "quad_B"
+  ],
+  "n_simulations": [
+   5,
+   9,
+   13,
+   17
+  ],
+  "n_episodes": 5,
+  "net": "UniformPolicyValueNet (uniform prior, value 0.0)",
+  "dirichlet_noise": false,
+  "rollout_n": 5,
+  "rollout_mode": "mean",
+  "rollout_blend": 0.0,
+  "rollout_budget": 1000000,
+  "backup_rule": "mean",
+  "c_exploration": 1.0,
+  "temperature_search": 1.0,
+  "temperature_select": 0.0,
+  "lmfit_max_nfev": 50,
+  "base_seed": 1234
+ },
+ "targets": {
+  "lin_D": {
+   "coeffs": [
+    0.0,
+    2.0
+   ],
+   "family": "linear",
+   "label": "Pure proportional: y = 2x, exactly the 3-token '* C1 x'",
+   "infix": "0.0 + 2.0*x"
+  },
+  "quad_B": {
+   "coeffs": [
+    6.0,
+    -5.0,
+    0.5
+   ],
+   "family": "quadratic",
+   "label": "Monotonic exterior: vertex x_v=5 far outside, pseudo-linear on the domain",
+   "infix": "6.0 + -5.0*x + 0.5*x**2"
+  }
+ },
+ "cells": [
+  {
+   "target": "lin_D",
+   "n_simulations": 5,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.033
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.028
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 1.0,
+     "prefix": "+ * C1 x C0",
+     "infix": "((C1*x)+C0)",
+     "n_moves": 3,
+     "wall_clock_s": 0.171
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.025
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.027
+    }
+   ],
+   "r2_mean": 1.0,
+   "r2_std": 0.0,
+   "r2_min": 1.0,
+   "r2_max": 1.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.4
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 1,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 3,
+     "Q": 1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 0,
+     "Q": null
+    }
+   ]
+  },
+  {
+   "target": "lin_D",
+   "n_simulations": 9,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.025
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.026
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 1.0,
+     "prefix": "+ * C1 x C0",
+     "infix": "((C1*x)+C0)",
+     "n_moves": 3,
+     "wall_clock_s": 0.266
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.026
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.028
+    }
+   ],
+   "r2_mean": 1.0,
+   "r2_std": 0.0,
+   "r2_min": 1.0,
+   "r2_max": 1.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.4
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 1,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 7,
+     "Q": 1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 0,
+     "Q": null
+    }
+   ]
+  },
+  {
+   "target": "lin_D",
+   "n_simulations": 13,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.027
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.026
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.067
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.023
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.029
+    }
+   ],
+   "r2_mean": 1.0,
+   "r2_std": 0.0,
+   "r2_min": 1.0,
+   "r2_max": 1.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.4
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 1,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 11,
+     "Q": 1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 0,
+     "Q": null
+    }
+   ]
+  },
+  {
+   "target": "lin_D",
+   "n_simulations": 17,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.029
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.026
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.066
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.023
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 1.0,
+     "prefix": "* C1 x",
+     "infix": "(C1*x)",
+     "n_moves": 1,
+     "wall_clock_s": 0.031
+    }
+   ],
+   "r2_mean": 1.0,
+   "r2_std": 0.0,
+   "r2_min": 1.0,
+   "r2_max": 1.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.4
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 1,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 15,
+     "Q": 1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 0,
+     "Q": null
+    }
+   ]
+  },
+  {
+   "target": "quad_B",
+   "n_simulations": 5,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 0.9972127902512478,
+     "prefix": "+ + + + * C1 x + C0 C0 C0 C0 C0",
+     "infix": "(((((C1*x)+(C0+C0))+C0)+C0)+C0)",
+     "n_moves": 11,
+     "wall_clock_s": 0.626
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 0.9972127902512478,
+     "prefix": "+ + + + * C1 x + C0 C0 C0 C0 C0",
+     "infix": "(((((C1*x)+(C0+C0))+C0)+C0)+C0)",
+     "n_moves": 11,
+     "wall_clock_s": 0.62
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 1.0,
+     "prefix": "+ + * C1 x C0 + * C2 * x x C0",
+     "infix": "(((C1*x)+C0)+((C2*(x*x))+C0))",
+     "n_moves": 7,
+     "wall_clock_s": 0.396
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 0.9972127902512478,
+     "prefix": "+ + + + * C1 x + C0 C0 C0 C0 C0",
+     "infix": "(((((C1*x)+(C0+C0))+C0)+C0)+C0)",
+     "n_moves": 11,
+     "wall_clock_s": 0.613
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 0.9972127902512478,
+     "prefix": "+ + + + C0 * C1 x + C0 C0 C0 C0",
+     "infix": "((((C0+(C1*x))+(C0+C0))+C0)+C0)",
+     "n_moves": 11,
+     "wall_clock_s": 0.626
+    }
+   ],
+   "r2_mean": 0.9977702322009983,
+   "r2_std": 0.001114883899500896,
+   "r2_min": 0.9972127902512478,
+   "r2_max": 1.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.6
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 1,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 1,
+     "Q": -0.8
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 0,
+     "Q": null
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 0,
+     "Q": null
+    }
+   ]
+  },
+  {
+   "target": "quad_B",
+   "n_simulations": 9,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.051
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.054
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.049
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.053
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.061
+    }
+   ],
+   "r2_mean": 0.0,
+   "r2_std": 0.0,
+   "r2_min": 0.0,
+   "r2_max": 0.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.6
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 3,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 1,
+     "Q": -0.8
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 1,
+     "Q": -1.0
+    }
+   ]
+  },
+  {
+   "target": "quad_B",
+   "n_simulations": 13,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.059
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.106
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.132
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.089
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.058
+    }
+   ],
+   "r2_mean": 0.0,
+   "r2_std": 0.0,
+   "r2_min": 0.0,
+   "r2_max": 0.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.6
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 7,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 1,
+     "Q": -0.8
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 1,
+     "Q": -1.0
+    }
+   ]
+  },
+  {
+   "target": "quad_B",
+   "n_simulations": 17,
+   "episodes": [
+    {
+     "episode": 0,
+     "seed": 1234,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.052
+    },
+    {
+     "episode": 1,
+     "seed": 1235,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.064
+    },
+    {
+     "episode": 2,
+     "seed": 1236,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.066
+    },
+    {
+     "episode": 3,
+     "seed": 1237,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.051
+    },
+    {
+     "episode": 4,
+     "seed": 1238,
+     "r2": 0.0,
+     "prefix": "C0",
+     "infix": "C0",
+     "n_moves": 1,
+     "wall_clock_s": 0.057
+    }
+   ],
+   "r2_mean": 0.0,
+   "r2_std": 0.0,
+   "r2_min": 0.0,
+   "r2_max": 0.0,
+   "root": [
+    {
+     "action": 0,
+     "production": "S -> + S S",
+     "N": 1,
+     "Q": -0.6
+    },
+    {
+     "action": 1,
+     "production": "S -> C0",
+     "N": 11,
+     "Q": 0.0
+    },
+    {
+     "action": 2,
+     "production": "S -> * C1 x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 3,
+     "production": "S -> * C2 * x x",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 4,
+     "production": "S -> * S S",
+     "N": 1,
+     "Q": -0.8
+    },
+    {
+     "action": 5,
+     "production": "S -> / S S",
+     "N": 1,
+     "Q": -1.0
+    },
+    {
+     "action": 6,
+     "production": "S -> * C3 sin * C4 x",
+     "N": 1,
+     "Q": -1.0
+    }
+   ]
+  }
+ ],
+ "total_wall_clock_s": 5.2
+}

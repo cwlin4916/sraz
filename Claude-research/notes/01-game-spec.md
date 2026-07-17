@@ -9,20 +9,18 @@
 - [3. Terminal reward: fit the constants, score the structure](#3-terminal-reward-fit-the-constants-score-the-structure)
 - [4. A worked episode (Figure 1)](#4-a-worked-episode-figure-1)
 - [5. Why the game is nontrivial](#5-why-the-game-is-nontrivial)
-- [6. First training run (seed 42, Figure 2)](#6-first-training-run-seed-42-figure-2)
 - [Appendix: Source map](#appendix-source-map)
 - [Appendix: Reproduce](#appendix-reproduce)
 
 ## Introduction
 
-1. This note specifies symbolic regression as a single-player grammar game: what the state, actions, and legality mask are; how the terminal reward scores an emitted expression; one worked episode replayed through the real environment; and the first AlphaZero training run on the game (§6).
+1. This note specifies symbolic regression as a single-player grammar game: what the state, actions, and legality mask are; how the terminal reward scores an emitted expression; and one worked episode replayed through the real environment. Training runs on the game are documented in the [second note](02-target-families.md).
 2. The game is context-free derivation as an MDP: a 15-slot token buffer holds the current sentential form, and each action rewrites one nonterminal with one production (§1).
 3. The grammar offers four primitives — a constant, a linear term, a quadratic term, and a sinusoid — combined by $\{+,*,/\}$; the agent chooses only the *structure*, the constants $C_k$ remain symbols (§2).
 4. At termination the constants are fitted by least squares against the target data; the reward is the $R^2$ of the fit, clipped to $[-1,1]$ (§3).
-5. The hidden target is $4\sin(4x) + C_0^* + C_1^* x + C_2^* x^2$, sampled at 41 points on $[1,3]$; the constants $C^* \sim U[1,4]^3$ are drawn **once** from the problem seed and fixed across episodes (per-episode resampling is opt-in). This note — figure, measured scores, and training run — uses problem seed 42 throughout (§0).
+5. The hidden target is $4\sin(4x) + C_0^* + C_1^* x + C_2^* x^2$, sampled at 41 points on $[1,3]$; the constants $C^* \sim U[1,4]^3$ are drawn **once** from the problem seed and fixed across episodes (per-episode resampling is opt-in). This note — figure and measured scores — uses problem seed 42 throughout (§0).
 6. The generating form needs 18 prefix tokens but the mask caps sentences at 14, so a perfect fit is unreachable; the best expressible surrogate is the 14-token sin-plus-constant-plus-quadratic form, which scores $R^2 = 0.9873$ (§5).
 7. Figure 1 shows a scripted 5-action episode that derives exactly that frontier expression and is scored through the full fit pipeline (§4).
-8. Section 6 documents one AlphaZero run at default hyperparameters (10 iterations × 20 self-play games × 25 simulations): it converges in the first iteration to the single-production expression $C_1 x$ ($R^2 = 0.8729$) and never escapes — a baseline, not a success.
 
 ## 0. Data & vocabulary
 
@@ -36,7 +34,7 @@ at 41 equispaced points $x_n \in [1,3]$.
 
 The $C^*$ are drawn once at construction from the problem seed and then **fixed**: the same expression scores identically across episodes. Per-episode resampling — fresh $C^*$ every reset, the original stochastic behavior — is opt-in.
 
-This note's instance is problem seed 42, whose constants are $C_0^* = 3.322$, $C_1^* = 2.317$, $C_2^* = 3.576$. The training driver reuses its run seed as the problem seed, so the seed-42 run in §6 plays this same instance.
+This note's instance is problem seed 42, whose constants are $$\boxed{C_0^* = 3.322, \quad C_1^* = 2.317, \quad C_2^* = 3.576}$$. The training driver reuses its run seed as the problem seed, so the seed-42 run in the [second note](02-target-families.md) plays this same instance.
 
 | Symbol | Plain-English meaning | Formula / value | Why it matters |
 |---|---|---|---|
@@ -125,7 +123,7 @@ A scripted, mask-legal 5-action episode on the seed-42 instance, replayed throug
 
 > **What this figure shows:** the 15-slot buffer being rewritten production-by-production until no nonterminal remains — ending exactly at the 14-token cap — then the terminal constant-fit that scores the emitted structure against the 41 target points.
 
-![One scripted episode of the SR grammar game](figures/sr_game_progression.png)
+![One scripted episode of the SR grammar game](../figures/sr_game_progression.png)
 
 **Figure 1: Symbolic regression as a grammar game — one scripted episode.** *Read.* Panel A: the derivation grows left to right, one action per row, and terminates once the fifth action removes the last nonterminal, filling 14 of the 15 slots. Panel B: the target points rise steeply and near-linearly while the fitted curve tracks the trend but smooths out the sinusoidal wiggle, since the sine frequency is mis-fitted.
 
@@ -137,13 +135,6 @@ A scripted, mask-legal 5-action episode on the seed-42 instance, replayed throug
 
 ## 5. Why the game is nontrivial
 
-> **Goal.** State the four properties that make this a hard RL problem rather than an enumeration exercise.
-
-- **The generating form is inexpressible.** The mask (§1) caps sentences at 14 tokens; the generating form $C_3\sin(C_4x) + C_0 + C_1x + C_2x^2$ needs 18 prefix tokens, so $R^2 = 1$ is unreachable and the agent must find the best expressible surrogate. The frontier is tight: Figure 1's episode — `+ * C3 sin * C4 x + C0 * C2 * x x` ($\sin$ + constant + quadratic) — is exactly 14 tokens, legal, and scores $0.9873$.
-- **Sparse reward.** $\rho(\pi)$ arrives only at termination; all intermediate steps score 0.
-- **Deterministic-by-default reward.** By default each structure has one fixed score, so this is a deterministic sparse-reward search problem with noise-free value targets — and a sound fit cache. The stochastic variant, where the value of a structure is an expectation over resampled $C^*$, is recoverable via the opt-in per-episode resampling.
-- **Nonconvex inner fit.** Fitting the sine frequency from init $2.5$ toward the true $4$ is nonconvex; Figure 1's episode stalls at $\hat C_4 = 2.54$, and even the true 18-token form only fits to $R^2 = 0.9996$. Structure quality is thus measured through an imperfect oracle.
-
 The measured score ladder on the seed-42 instance (each value measured through the reward pipeline of §3, deterministic):
 
 | structure | prefix tokens | $\rho$ |
@@ -152,43 +143,10 @@ The measured score ladder on the seed-42 instance (each value measured through t
 | $C_3\sin(C_4x)$ | 6 | $-1.0000$ (fit fails) |
 | $C_2x^2$ | 5 | $0.8409$ |
 | $C_1x$ | 3 | $0.8729$ |
-| $C_1x + C_2x^2$ | 7 | $0.9316$ |
-| $C_0 + C_1x + C_2x^2$ | 9 | $0.9731$ |
+| $C_1x + C_2x^2$ | 9 | $0.9316$ |
+| $C_0 + C_1x + C_2x^2$ | 11 | $0.9731$ |
 | $C_3\sin(C_4x) + C_0 + C_2x^2$ (frontier, Fig. 1) | 14 | $0.9873$ |
 | generating form (needs a buffer of $\ge 19$ slots) | 18 | $0.9996$ — unreachable |
-
-## 6. First training run (seed 42, Figure 2)
-
-> **Goal.** Document one AlphaZero run at default hyperparameters — the baseline every later experiment compares against.
-
-One run of the training driver at all-default hyperparameters, seed 42 — the same problem instance as the rest of this note (command in the Reproduce appendix). Total wall clock ≈ 3 s: episodes are 1–13 actions and lmfit calls are cheap and cached.
-
-- **Search:** 10 iterations × 20 self-play games × 25 MCTS simulations, sequential.
-- **Network:** MLP 2×128 on the one-hot $15 \times 12$ observation.
-- **Optimization:** Adam, lr $10^{-3}$, 10 epochs, batch 32.
-- **Exploration:** temperature 1.0, $c_{\mathrm{explore}}$ 1.0, Dirichlet noise $(0.3, 0.25)$.
-- **Eval:** 1 greedy episode per iteration.
-
-| iteration | greedy $R^2$ | avg self-play $R^2$ | train loss | wall clock (s) |
-|---|---|---|---|---|
-| 1 | $0.8729$ | $0.8255$ | $5.250$ | $1.21$ |
-| 2 | $0.8729$ | $0.7333$ | $4.019$ | $0.73$ |
-| 5 | $0.8729$ | $0.8729$ | $1.379$ | $0.12$ |
-| 10 | $0.8729$ | $0.8729$ | $0.645$ | $0.14$ |
-
-Best expression found: `* C1 x`, i.e. $C_1 x$, at $\rho = 0.8729$ — found at iteration 1 and never improved. The known ceiling is the 14-token frontier at $0.9873$ (§5).
-
-> **What this figure shows:** the greedy-policy reward and the average self-play reward per iteration over the full 10-iteration run.
-
-![Reward curve of the first training run](figures/symreg_reward_curve_seed42.png)
-
-**Figure 2: AlphaZero on the SR grammar game — first run, seed 42.** *Read.* The greedy-policy line is flat from the first iteration; the average self-play reward dips while noise still explores, then converges onto the greedy line and stays there.
-
-| Reading | Statement |
-|---|---|
-| Literal | Two series over 10 iterations: the greedy-policy $R^2$, constant throughout, and the average self-play $R^2$, which dips early and then joins the greedy line. |
-| Math/Comp | Greedy $R^2 = 0.8729$ at every iteration; avg self-play $R^2$ falls from $0.83$ to $0.73$ at iteration 2, then sits at $0.8729$ from iteration 5. From iteration 3 on, nearly every self-play game is the 1-action episode `* C1 x`; training loss falls $5.25 \to 0.65$ as the network memorizes that single trajectory. |
-| Interp | Premature convergence to a one-action local optimum: $C_1 x$ is the best *single-production* sentence (§5's ladder), and once the policy concentrates there, 25 simulations of temperature-1 self-play never composes the multi-production structures ($0.9316$ upward) that require passing through lower-immediate-value nonterminal states. The baseline motivates stronger exploration — more simulations, higher temperature, or explicit novelty pressure — in the next note. |
 
 ## Appendix: Source map
 
@@ -208,18 +166,20 @@ All game code lives in `src/sraz/`; Figures 1–2 are produced by the scripts be
 | MCTS stash/unstash | [game.py:272-293](../../src/sraz/instances/symreg/game.py#L272-L293) |
 | Engine Game ABC (`reset_wrapper`/`step_wrapper`/`clone`) | [core/game.py:67-108](../../src/sraz/core/game.py#L67-L108) |
 | SR hyperparameter defaults | [config.py](../../src/sraz/instances/symreg/config.py) |
-| Contract test replaying the worked episode | [test_grammar_env.py:58-72](../../tests/test_grammar_env.py#L58-L72) |
-| Training driver (§6) | [run_symreg.py](../../scripts/run/run_symreg.py) |
+| Contract test replaying the worked episode | [test_game_grammar.py:58-72](../../tests/instances/symreg/test_game_grammar.py#L58-L72) |
+| Regression test pinning this note's ladder | [test_symreg_targets.py](../../tests/test_symreg_targets.py) |
 | Figure 1 driver | [plot_sr_game.py](../../scripts/plotting/plot_sr_game.py) |
 
 ## Appendix: Reproduce
 
 ```bash
-# from repo root; writes docs/notes/figures/sr_game_progression.png (Figure 1)
+# from repo root; writes Claude-research/figures/sr_game_progression.png (Figure 1)
 python scripts/plotting/plot_sr_game.py
 
-# the documented training run (§6); writes experiments/symreg/<timestamp>_seed42_mcts25_iter10/
-python scripts/run/run_symreg.py --seed 42
-# Figure 2 is reward_curve.png copied from that experiment dir:
-#   cp experiments/symreg/<run>/reward_curve.png docs/notes/figures/symreg_reward_curve_seed42.png
+# re-measure this note's score ladder and problem instance
+python -m pytest tests/test_symreg_targets.py -k "default_game_is_untouched or documented_token_counts" -q
 ```
+
+Training runs on this game — the learned baseline that used to sit in this note,
+and the pure-search target families — are in the [second note](02-target-families.md),
+which also defines the greedy $R^2$ those runs are scored by.

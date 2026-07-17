@@ -48,7 +48,7 @@ escaped.
 
 ### Learning curves
 
-![AlphaZero learning curves on additive_quadratic by MCTS budget](figures/additive_sim_sweep.png)
+![AlphaZero learning curves on additive_quadratic by MCTS budget](../figures/additive_sim_sweep.png)
 
 *Greedy R² (left) and average self-play R² (right) vs training iteration, one
 line per MCTS simulation budget (seed 42; reproducible). At 25 sims both stay

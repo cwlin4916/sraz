@@ -18,12 +18,21 @@ def test_symreg_config_defaults():
     cfg = SymRegConfig()
     assert is_dataclass(cfg)
     assert cfg.game.game_cls is SymRegGame
-    assert cfg.game.kwargs == {"max_len": 15, "redraw_constants": False, "problem_seed": 0}
+    # target=None / lmfit_max_nfev=None keep the default sinusoid instance on
+    # [1, 3] with an uncapped inner optimizer -- the setup the first note's
+    # numbers were measured on.
+    assert cfg.game.kwargs == {
+        "max_len": 15, "redraw_constants": False, "problem_seed": 0,
+        "target": None, "lmfit_max_nfev": None,
+    }
     assert cfg.net.net_cls is SymRegPolicyValueNet
     assert cfg.net.kwargs == {}
     assert cfg.agent.mcts_params == {
         "n_simulations": 25, "temperature": 1.0, "c_exploration": 1.0,
+        "backup_rule": "mean",
     }
+    assert cfg.trainer.self_play_add_noise is True
+    assert cfg.trainer.self_play_temperature is None
     assert cfg.agent.random_seeds == {"mcts": 0, "train": 1, "eval": 2, "external_policy": 3}
     assert (cfg.trainer.n_games_per_train, cfg.trainer.n_past_iterations_to_train) == (20, 10)
     assert cfg.trainer.n_procs == -1 and cfg.evaluator.n_procs == -1

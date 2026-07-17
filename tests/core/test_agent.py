@@ -160,18 +160,34 @@ def test_policy_low_temperature_near_argmax_vs_temp_one_sampling(agent, game):
     assert probs_low[0] > probs_t1[0]
 
 
-def test_policy_temperature_zero_yields_non_finite_probs(agent, game):
-    """Documents current behavior: temperature_override=0.0 divides the log
-    visit counts by zero inside MCTS._temperature_probs_with_fallback
-    (src/sraz/core/mcts.py:191), producing NaN probabilities instead of a
-    hard argmax. Callers must use a small positive temperature (e.g. 0.05)
-    for greedy selection. Reported as a suspected bug, not fixed here."""
+def test_policy_temperature_zero_is_a_hard_argmax(agent, game):
+    """temperature_override=0.0 is the greedy limit of counts**(1/T): all mass
+    on the most-visited action.
+
+    This previously divided the log visit counts by zero and returned NaN, so
+    callers had to fake greedy selection with a small positive temperature
+    (e.g. 0.05). MCTS._temperature_probs_with_fallback now special-cases T = 0
+    before the dividing path.
+    """
     np.random.seed(0)
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
+        warnings.simplefilter("error", RuntimeWarning)  # no divide-by-zero
         probs = agent.policy(game, add_noise=False, temperature_override=0.0)
     assert probs.shape == (2,)
-    assert np.isnan(probs).any()
+    assert np.isfinite(probs).all()
+    assert probs.sum() == pytest.approx(1.0)
+    assert (probs > 0).sum() == 1
+    assert set(probs.tolist()) == {0.0, 1.0}
+
+
+def test_policy_temperature_zero_agrees_with_a_tiny_temperature(agent, game):
+    """The T -> 0 limit: a very small positive temperature already selects the
+    same action, so the special case is continuous with the general path."""
+    np.random.seed(0)
+    greedy = agent.policy(game, add_noise=False, temperature_override=0.0)
+    np.random.seed(0)
+    nearly = agent.policy(game, add_noise=False, temperature_override=0.01)
+    assert int(np.argmax(greedy)) == int(np.argmax(nearly))
 
 
 def test_policy_add_noise_true_perturbs_and_is_reproducible_via_injected_rng(agent, game):

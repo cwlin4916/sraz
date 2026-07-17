@@ -17,7 +17,7 @@ src/sraz/training/      Trainer (self-play -> replay window -> net.train)
 src/sraz/utils/         determinism, multiprocessing, checkpoints, stats
 src/sraz/instances/symreg/   the SR grammar game, MLP policy/value net, config
 scripts/run/run_symreg.py    training driver
-docs/notes/             experiment notes
+Claude-research/        research notes, results, figures
 ```
 
 ## Install
@@ -36,5 +36,5 @@ python scripts/run/run_symreg.py --seed 42  # first experiment, a few minutes
 ```
 
 Results land in `experiments/symreg/<timestamp>_.../` (config, jsonl logs,
-reward curve, checkpoint). See [docs/notes/01.md](docs/notes/01.md) for the
+reward curve, checkpoint). See [Claude-research/notes/01-game-spec.md](Claude-research/notes/01-game-spec.md) for the
 first documented run.

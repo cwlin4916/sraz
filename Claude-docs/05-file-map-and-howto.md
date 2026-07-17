@@ -24,7 +24,7 @@ src/sraz/
 scripts/
   run/run_symreg.py         training driver (CLI, greedy eval, experiment dir, plots)
   plotting/plot_sr_game.py  Figure 1 generator (replays the real env)
-docs/notes/01.md            formal SR game spec + first training run (seed 42)
+Claude-research/notes/01-game-spec.md            formal SR game spec + first training run (seed 42)
 tests/                      ~254 tests: engine (mcts_env_*, game, agent, trainer, ...) + symreg
 ```
 
@@ -81,7 +81,7 @@ and `checkpoints/final/` (network weights + pickled replay buffer + RNG state).
 ## Regenerate Figure 1
 
 ```bash
-python scripts/plotting/plot_sr_game.py   # writes docs/notes/figures/sr_game_progression.png
+python scripts/plotting/plot_sr_game.py   # writes Claude-research/figures/sr_game_progression.png
 ```
 
 It replays the canonical scripted episode through the *real* `SymRegGame` and

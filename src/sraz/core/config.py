@@ -33,6 +33,8 @@ class TrainerConfig:
 	n_past_iterations_to_train: int = 20
 	n_procs: int = 8
 	checkpoint_dir: str = "checkpoints"
+	self_play_add_noise: bool = True
+	self_play_temperature: Optional[float] = None
 
 
 @dataclass

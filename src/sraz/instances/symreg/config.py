@@ -41,6 +41,8 @@ class SymRegConfig(MetaConfig):
                 "max_len": 15,
                 "redraw_constants": False,
                 "problem_seed": 0,
+                "target": None,
+                "lmfit_max_nfev": None,
             },
         )
         self.net = NetConfig(
@@ -52,6 +54,7 @@ class SymRegConfig(MetaConfig):
                 "n_simulations": 25,
                 "temperature": 1.0,
                 "c_exploration": 1.0,
+                "backup_rule": "mean",
             },
             reward_discount=1.0,
             random_seeds={
@@ -76,20 +79,45 @@ class SymRegConfig(MetaConfig):
             plot_path="symreg_training_metrics.png",
         )
 
+    def use_uniform_net(self, value: float = 0.0) -> "SymRegConfig":
+        """Swap the learned net for a uniform prior with constant value.
+
+        Turns the run into pure UCT: `build` still returns a Trainer, and its
+        iterations still batch self-play games, but `train` is a no-op, so
+        nothing carries from one iteration to the next.
+        """
+        self.net = NetConfig(net_cls=UniformPolicyValueNet, kwargs={"value": value})
+        return self
+
     def build(self):
         """Build symreg game, network, agent, and trainer (no evaluator in v1)."""
         prob = get_problem(self.problem)
-        # prob.game_kwargs() supplies (grammar, target); self.game.kwargs supplies
-        # max_len/redraw/problem_seed. No key overlap, so the merge is clean.
-        game = SymRegGame(**{**prob.game_kwargs(), **self.game.kwargs})
+        prob_kwargs = prob.game_kwargs()
+        if self.game.kwargs.get("target") is not None:
+            # A named target supplies its own ys, grid and formula. The problem
+            # still supplies the grammar its members are scored by.
+            prob_kwargs.pop("target_ys_fn")
+            prob_kwargs.pop("target_infix")
+        # prob_kwargs supplies (grammar, target); self.game.kwargs supplies
+        # max_len/redraw/problem_seed/target. No key overlap, so the merge is clean.
+        game = SymRegGame(**{**prob_kwargs, **self.game.kwargs})
         n_actions = game.state_len * game.grammar.nprods
         mcts_params = self.agent.mcts_params
-        if self.pure_mcts:
-            # Net-free classic MCTS: uniform prior + random-rollout leaf values.
-            net = UniformPolicyValueNet(n_actions=n_actions)
-            mcts_params = {**mcts_params}
-            mcts_params.setdefault("rollout_n", 20)  # value comes from rollouts
-            mcts_params["rollout_blend"] = 0.0       # ignore the (zero) net value
+
+        # Two routes to the net-free search: `pure_mcts`, which also points leaf
+        # evaluation at rollouts, and `use_uniform_net()`, which swaps the net
+        # and leaves the MCTS params alone.
+        uniform = self.pure_mcts or self.net.net_cls is UniformPolicyValueNet
+        if uniform:
+            net_kwargs = (self.net.kwargs
+                          if self.net.net_cls is UniformPolicyValueNet else {})
+            net = UniformPolicyValueNet(n_actions=n_actions, **net_kwargs)
+            if self.pure_mcts:
+                # Net-free classic MCTS: the value comes from random rollouts,
+                # not from the net's constant.
+                mcts_params = {**mcts_params}
+                mcts_params.setdefault("rollout_n", 20)
+                mcts_params["rollout_blend"] = 0.0
         else:
             net_kwargs = {
                 "state_len": game.state_len,
@@ -113,5 +141,7 @@ class SymRegConfig(MetaConfig):
             n_past_iterations_to_train=self.trainer.n_past_iterations_to_train,
             n_procs=self.trainer.n_procs,
             checkpoint_dir=self.trainer.checkpoint_dir,
+            self_play_add_noise=self.trainer.self_play_add_noise,
+            self_play_temperature=self.trainer.self_play_temperature,
         )
         return game, net, agent, trainer

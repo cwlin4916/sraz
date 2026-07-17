@@ -11,8 +11,9 @@ Seven tests covering ``perform_simulations`` noise handling,
    ``nn_policy`` bit-for-bit unchanged.
 3. reuse_reinjects_fresh_noise — ``perform_simulations_reuse`` restores
    ``nn_policy_original`` before mixing, so repeated calls inject fresh noise
-   each time (no noise-on-noise compounding) and the residual check holds
-   after every call.
+   each time. Each post-call policy is checked *bitwise* against an
+   RNG-replayed fresh mix of the ORIGINAL policy, which fails under
+   noise-on-noise compounding (mixing into the stale noisy policy).
 4. reuse_without_noise_matches_plain — without noise/rollouts the reuse entry
    point behaves identically to ``perform_simulations``: same probs array and
    same root visit counts on a depth-2 binary tree.
@@ -23,8 +24,9 @@ Seven tests covering ``perform_simulations`` noise handling,
 6. nodes_retained_across_advance — ``advance_to`` performs no pruning:
    ``len(mcts.nodes)`` is unchanged.
 7. noise_masked_positions_stay_zero_after_search — a full noisy search on a
-   masked bandit never leaks probability or visits onto the masked arm; its
-   UCB stays ``-inf``.
+   masked bandit never leaks probability or visits onto the masked arm; the
+   root's ``nn_policy`` itself keeps the masked entry at exactly 0 (the
+   noise mix is masked) and its UCB stays ``-inf``.
 
 Noise math (defaults ``alpha=0.3``, ``eps=0.25``): after injection,
 ``nn_policy == (1-eps)*nn_policy_original + eps*masked_noise`` where
@@ -156,14 +158,19 @@ def test_noise_skipped_on_visited_root():
 
 def test_reuse_reinjects_fresh_noise():
     """``perform_simulations_reuse`` restores ``nn_policy_original`` before
-    mixing, so each call injects *fresh* noise: the original is preserved
-    across calls, the residual check holds after every call, and the two
-    post-call policies differ (no noise-on-noise compounding)."""
-    np.random.seed(37)
+    mixing, so each call injects *fresh* noise into the ORIGINAL policy.
+
+    Each post-call ``nn_policy`` is asserted bitwise-exactly against an
+    RNG-replayed reconstruction of ``(1-eps)*original + eps*masked_noise``
+    (identical float ops, in order, as the implementation). A noise-on-noise
+    compounding bug — mixing into the stale noisy policy instead of the
+    restored original — produces a different array on the second call and
+    fails the exact comparison, even when the residual heuristic happens to
+    stay non-negative and normalized."""
     game = _make_masked_bandit()
     net = UniformNet(4)
     mcts = MCTS(game, net, n_simulations=10, temperature=1.0,
-                c_exploration=1.5)
+                c_exploration=1.5, rng=np.random.default_rng(37))
 
     # Visit the root first (no noise) so both reuse calls hit a visited node.
     mcts.perform_simulations(None)
@@ -173,18 +180,51 @@ def test_reuse_reinjects_fresh_noise():
         f"total_N={root.total_N}"
     )
     original_before = np.array(root.nn_policy_original, copy=True)
+    eps = mcts.dirichlet_epsilon
 
+    def expected_fresh_mix(rng_state):
+        """Replay the Dirichlet draw from ``rng_state`` and reproduce the
+        implementation's mix bitwise (same ops, same order) against the
+        ORIGINAL policy. A reuse call with ``add_noise=True`` and no rollouts
+        consumes exactly one ``rng.dirichlet`` draw, so replaying from the
+        pre-call bit-generator state recovers exactly the injected noise."""
+        replay = np.random.default_rng()
+        replay.bit_generator.state = rng_state
+        noise = replay.dirichlet(
+            [mcts.dirichlet_alpha] * original_before.size
+        ).reshape(original_before.shape)
+        masked_noise = noise * root.action_mask
+        masked_noise /= masked_noise.sum()
+        return (1 - eps) * original_before + eps * masked_noise
+
+    rng_state_1 = mcts.rng.bit_generator.state
     mcts.perform_simulations_reuse(None, add_noise=True)
     policy_after_first = np.array(root.nn_policy, copy=True)
     original_after_first = np.array(root.nn_policy_original, copy=True)
     _assert_valid_noise_residual(
         root, mcts.dirichlet_epsilon, MASKED_ARM, "reuse call 1")
+    np.testing.assert_array_equal(
+        policy_after_first, expected_fresh_mix(rng_state_1),
+        err_msg=(
+            "first reuse call must equal a fresh (1-eps)/eps mix of "
+            "nn_policy_original with the replayed masked Dirichlet noise"
+        ),
+    )
 
+    rng_state_2 = mcts.rng.bit_generator.state
     mcts.perform_simulations_reuse(None, add_noise=True)
     policy_after_second = np.array(root.nn_policy, copy=True)
     original_after_second = np.array(root.nn_policy_original, copy=True)
     _assert_valid_noise_residual(
         root, mcts.dirichlet_epsilon, MASKED_ARM, "reuse call 2")
+    np.testing.assert_array_equal(
+        policy_after_second, expected_fresh_mix(rng_state_2),
+        err_msg=(
+            "second reuse call must mix fresh noise into the restored "
+            "nn_policy_original, not into the previous noisy policy "
+            "(noise-on-noise compounding)"
+        ),
+    )
 
     # The clean original never changes.
     assert np.array_equal(original_before, original_after_first), (
@@ -322,7 +362,10 @@ def test_nodes_retained_across_advance():
 
 def test_noise_masked_positions_stay_zero_after_search():
     """A full 50-sim noisy search on the masked bandit must keep the masked
-    arm at zero probability, zero visits, and -inf UCB."""
+    arm at zero probability, zero visits, and -inf UCB — and the root's
+    ``nn_policy`` itself must keep the masked entry at exactly 0, i.e. the
+    Dirichlet noise mix is masked (``masked_noise[MASKED_ARM] == 0``, so the
+    mixed entry is ``(1-eps)*0 + eps*0 == 0.0``)."""
     np.random.seed(71)
     game = _make_masked_bandit()
     net = UniformNet(4)
@@ -337,6 +380,14 @@ def test_noise_masked_positions_stay_zero_after_search():
     )
 
     root = mcts.nodes["root"]
+    # Policy-side mask integrity: unmasked noise would leak probability onto
+    # the masked arm of nn_policy itself, independent of visit counts.
+    assert root.nn_policy[MASKED_ARM] == 0.0, (
+        f"noise leaked onto the masked arm of nn_policy: {root.nn_policy}"
+    )
+    _assert_valid_noise_residual(
+        root, mcts.dirichlet_epsilon, MASKED_ARM, "post-search")
+
     assert (MASKED_ARM,) not in root.action_N, (
         f"masked arm was visited: action_N={root.action_N}"
     )

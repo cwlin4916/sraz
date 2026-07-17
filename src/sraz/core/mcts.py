@@ -92,7 +92,7 @@ class MCTS():
         # object self-contained and, crucially, never touches the process-global
         # np.random -- which the driver does not seed and which fork-based
         # multiprocessing workers would otherwise share (drawing identical
-        # noise across self-play games). See docs/notes and Claude-reviews.
+        # noise across self-play games). See Claude-research/notes and Claude-reviews.
         self.rng = rng if rng is not None else np.random.default_rng()
 
         # min max Q value
@@ -198,6 +198,14 @@ class MCTS():
         counts = np.asarray(counts)
         nonzero = counts > 0
         if nonzero.any():
+            # T == 0 is the greedy limit of counts**(1/T): all mass on the
+            # most-visited action. Taken as a special case because the general
+            # path divides by T. Ties go to the lowest flat index, so a
+            # zero-temperature episode is fully deterministic.
+            if self.temperature == 0:
+                probs = np.zeros_like(counts, dtype=np.float64)
+                probs[np.argmax(counts)] = 1.0
+                return probs
             log_counts = np.full_like(counts, -np.inf, dtype=np.float64)
             log_counts[nonzero] = np.log(counts[nonzero]) / self.temperature
             log_counts -= log_counts.max()

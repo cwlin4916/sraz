@@ -3,7 +3,7 @@
 Everything SR-specific lives in `src/sraz/instances/symreg/`. It supplies the
 two engine ABCs ([02-architecture](02-architecture.md)) — a `Game` and a
 `PolicyValueNet` — plus a config that wires the run together. This doc is the
-code-level companion to the formal spec in `docs/notes/01.md`.
+code-level companion to the formal spec in `Claude-research/notes/01-game-spec.md`.
 
 ## `game.py` — the grammar game + SR reward
 

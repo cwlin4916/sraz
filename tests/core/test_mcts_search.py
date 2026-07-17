@@ -23,7 +23,11 @@ Conventions relied on throughout (verified against the implementation):
 - ``perform_simulations`` restores the game state after every simulation, so
   the root node is ``mcts.nodes[game.hashable_obs]`` after the search.
 - One-step bandits back up the same deterministic value on every visit of an
-  edge, so ``action_Q`` equals the arm reward exactly under every backup rule.
+  edge. The mean rule stores ``sum(values) / len(values)``, which reproduces
+  the reward bit-for-bit for EVERY visit count n only when the reward is a
+  dyadic rational (e.g. 0.25, -0.5, 1.0); for non-dyadic rewards like 0.2 it
+  already fails at n = 3. All exact-equality Q assertions in this module
+  therefore use dyadic rewards only.
 """
 
 from __future__ import annotations
@@ -58,11 +62,14 @@ def _root(mcts: MCTS):
 
 
 def test_bandit_exact_Q_and_optimal_arm():
-    """3-armed bandit with rewards [0.2, 1.0, -0.5]: after 60 simulations the
+    """3-armed bandit with rewards [0.25, 1.0, -0.5]: after 60 simulations the
     visit-count distribution peaks on arm 1, and every visited arm's Q equals
-    its reward EXACTLY (each edge always backs up the same deterministic
-    value, so even the mean rule reproduces the reward bit-for-bit here)."""
-    rewards = [0.2, 1.0, -0.5]
+    its reward EXACTLY. Each edge always backs up the same deterministic
+    value, and exactness under the default mean rule holds because the
+    rewards are dyadic: ``sum(n*[r]) / n`` is bit-exact for every visit count
+    n only for dyadic r (it already fails for r=0.2 at n=3), so the assertion
+    is robust to any change in exploration order or visit counts."""
+    rewards = [0.25, 1.0, -0.5]
     game = make_bandit(rewards)
     net = UniformNet(3)
     mcts = MCTS(game, net, n_simulations=60)
@@ -187,9 +194,13 @@ def test_delayed_trap_bellman():
     (total 0.9). Only the Bellman composition Q = immediate_reward + V(s')
     ranks action 1 above the greedy action 0.
 
-    - mean backup: Q(1) approaches 0.9 from below (the first backup of the
-      edge lands before its subtree completes, contributing -0.1 + nn_value),
-      but must already exceed Q(0), and visit counts must pick action 1.
+    - mean backup: Q(0) == 0.5 EXACTLY for any visit count (every backup on
+      edge 0 is 0.5 + 0.0 — first visit: immediate reward plus the unexpanded
+      leaf's nn_value 0.0; later visits: 0.5 plus the greedy subtree's 0.0
+      return — and means of the dyadic 0.5 are exact). Q(1) approaches 0.9
+      from below (the first backup of the edge lands before its subtree
+      completes, contributing -0.1 + nn_value) and equals the reconstructed
+      mean of its backups bit-for-bit; visit counts must pick action 1.
     - max backup: both Qs are EXACT path totals, 0.9 and 0.5.
     """
     # -- mean backup: correct ranking, contaminated-but-ordered Q values --
@@ -205,6 +216,19 @@ def test_delayed_trap_bellman():
     )
     q0, q1 = root.action_Q[(0,)], root.action_Q[(1,)]
     assert q1 > q0, f"mean backup: Q(1)={q1} should exceed Q(0)={q0}"
+    # Every backup on edge 0 is exactly 0.5 + 0.0, and means of the dyadic
+    # 0.5 are exact for every visit count — so pin the greedy branch exactly.
+    assert q0 == 0.5, f"mean backup: Q(0)={q0!r} should be exactly 0.5"
+    # Edge 1 backs up -0.1 once (the partial first backup) and then 0.9 on
+    # every later visit. Reconstruct the mean with the same sum/len
+    # computation update_edge uses, so the comparison is bit-exact (the
+    # algebraic form (-0.1 + 0.9*(n1-1))/n1 differs in the last ulp).
+    n1 = root.action_N[(1,)]
+    expected_q1 = sum([-0.1] + [0.9] * (n1 - 1)) / n1
+    assert q1 == expected_q1, (
+        f"mean backup: Q(1)={q1!r} should equal the reconstructed mean "
+        f"{expected_q1!r} of its N={n1} backups"
+    )
     # Pre-terminal partial backups drag the mean below the true 0.9.
     assert q1 < 0.9, (
         f"mean backup is contaminated by the partial first backup, so "
