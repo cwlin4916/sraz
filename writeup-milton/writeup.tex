@@ -78,6 +78,7 @@
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\D}{\mathcal{D}}
 \newcommand{\Simplex}{\Delta^{d-1}}
+\newcommand{\Dist}{\Delta}   % \Dist(S): probability distributions on the set S
 \newcommand{\noi}{\noindent}
 \newcommand{\oracle}{\text{oracle}}
 \newcommand{\agent}{\text{agent}}
@@ -164,7 +165,55 @@
 \section{A controlled study of pure Monte Carlo tree search for symbolic regression}
 \label{sec:pure-mcts-study}
 
-\subsection{Motivation and scope}
+\subsection{Problem state for symbolic regression}
+
+\begin{question}
+What is our problem set up? 
+\end{question}
+Suppose $(x_i,y_i)$ are a set of points generated from an expression 
+$$
+h(x_i)=y_i 
+$$
+\noi for a fixed expression $h$ (unknown), $h$ is a quadratic equation.  \\ 
+
+The object being optimized: is the discrete set of symbolic strucutres, over $$\c{T}= \c{P}(\crbr{1,x,x^2})$$.  \\ 
+
+
+\noi Symbolic regression search of the structures $\tau$: 
+\noi We have an expression : 
+$$
+\tau_\beta(x) = \beta_ 0 + \beta_1(x) + \beta_2 x^2 
+$$
+
+\noi we have the variables $1,x,x^2$ (discrete set) , $\beta=(\beta_1,\beta_2,\beta_3)$  are continuous.
+ 
+We will fit 
+$$
+\hat{\beta}_\tau = \arg\min _\beta \frac{1}{n} \sum_{i=1}^n (y_i -\tau_\beta(x_i))^2 
+$$
+
+\noi Symbolic search find all $\tau \in \c{T}$ (structures) 
+$$
+\tau^* = \arg \min _{\tau \in \c{T}} R(\tau, \widehat{\beta}_\tau )
+$$
+\noi where $R$ is $R^2$ (why? ) 
+
+
+\begin{question}
+    What simplifications should we make to see the impact of MCTS? 
+\end{question}
+\noi Some simplification we should make in the first experimental design: 
+
+\begin{itemize}
+    \item no variable length trees. 
+    \item no invalid expressions. 
+    \item no noise. 
+    \item no complex penalty. 
+    \item no additional operator. 
+    \item No neural policy or value network. 
+\end{itemize}
+
+\noi So we pretty much turn the problem into a \textit{subset selection}
 
 The purpose of this study is to characterize the finite-budget limitations of
 pure Monte Carlo tree search (MCTS) in grammar-based symbolic regression.
@@ -174,26 +223,71 @@ search, one must determine what information the underlying pure-search
 procedure estimates and when that information is aligned with symbolic
 optimization.
 
+
+
+\subsection{Motivation and scope}
+
+
+\begin{question}
+What problems do we want to identify? 
+\end{question}
+
+
 The central distinction is between the quality of a typical random completion
-and the quality of the best reachable completion.  Let \(s\) be a partial
-derivation and let \(\mathcal E(s)\) denote the set of terminal expressions
-reachable from \(s\).  The best-achievable value is
+and the quality of the best reachable completion.  \\ 
+
+
+Let \(s\) be a partial,
+derivation , let $\c{A}(s)$ be set of its legal actions, 
+let $T(s,a)$ be the deterministic transition function. 
+$$
+T: \c{S} \times \c{A} \ra \c{S} 
+$$
+
+A complete sequence of actions , produce a terminal expression $\pi$, with reward $R(\pi)$. \\  
+
+\begin{question}
+Can we design problems where it is easy to analytically evaluate $R(\pi)$. 
+
+\end{question}
+
+
+
+
+$$\mathcal E(s):= \crbr{ \pi : \pi \text{ can be completed from $s$}}$$  denote the set of terminal expressions
+reachable from \(s\).   \\ 
+
+\begin{question}
+What is the best expression hidden below the state? 
+\end{question}
+\noi The best-achievable value is
 \begin{equation}
     V^*(s)
     =
     \max_{\pi\in\mathcal E(s)} R(\pi),
     \label{eq:vstar}
 \end{equation}
-where \(R(\pi)\) is the terminal symbolic-regression reward.  By contrast,
-consider the fixed random-completion policy that, at each nonterminal state
+where \(R(\pi)\) is the terminal symbolic-regression reward.  \\ 
+
+\begin{question}
+In MCTS we use random roll out: what is the typical uniformly random completion under this state? 
+\end{question}
+
+\noi 
+Consider the fixed random-completion policy that, at each nonterminal state
 \(s\), selects uniformly among the legal actions \(\mathcal A(s)\),
 \[
     q(a\mid s)=\frac{1}{|\mathcal A(s)|},
     \qquad a\in\mathcal A(s).
 \]
-Because transitions are deterministic, following this policy from \(s\) to
+Because transitions are deterministic, following  a uniform policy from \(s\) to
 termination induces a distribution \(q(\pi\mid s)\) over the completions
-\(\pi\in\mathcal E(s)\), and the mean-rollout value is
+\(\pi\in\mathcal E(s)\), i.e. 
+\[
+q(-|s) \in \text{Dist}(\c{E}(s)).
+\]
+\\ 
+\noi The mean-rollout value is
 \begin{equation}
     V^q(s)
     =
@@ -201,6 +295,25 @@ termination induces a distribution \(q(\pi\mid s)\) over the completions
     \bigl[R(\pi)\bigr].
     \label{eq:vroll}
 \end{equation}
+
+
+\begin{rem}
+Why do we consider uniform distribution: 
+MCTS has 4 stage: 
+\begin{enumerate}
+    \item select (start at root) 
+    Choose action according to UCT formula 
+    $$
+a^* \in \arg \max _{a \in \c{A}(s)} \sqbr{Q(s,a) + c \sqrt{\frac{\log N(s)}{N(s,a)}}}
+    $$
+    \item Let $s$ be the state which reach at the "end" of the selection phase. 
+    We have an expansion policy : which is a uniform roll out from $s$ to obtain the value $V^q(s)$. 
+
+    \item Value backup: ... 
+\end{enumerate}
+\end{rem}
+
+\begin{rem} 
 The optimization objective depends on \(V^*\), whereas conventional UCT uses
 empirical mean returns as its exploitation statistic
 \cite{kocsis2006bandit}.  Asymptotic consistency does not by itself imply
@@ -214,8 +327,24 @@ regression explicitly optimizes upper-tail rather than expected performance
 \cite{petersen2021deep}.  Recent MCTS-based symbolic-regression systems also
 emphasize learned proposal mechanisms or extreme-value allocation rather than
 pure mean-based UCT \cite{kamienny2023deep,huang2025improving}.
+\end{rem} 
 
-We isolate two potential sources of difficulty:
+\begin{thoughts}
+
+We  believe there are two potential problems that can make pure MCTS bad:  \\ 
+
+\end{thoughts}
+% \begin{rem}
+% We can obtain 
+% $$
+% x_0 + \beta_1 x_1 + \beta_2 x_1 
+% $$
+
+% $$
+% x_0 + \beta_1 x_1 
+% $$
+% \end{rem}
+
 \begin{enumerate}
     \item \emph{value-semantic failure}: \(V^q\) ranks competing branches in
     the opposite order from \(V^*\); formally, for two sibling states $s_1$ and $s_2$, a value-semantic failure exists if:$$V^q(s_1) > V^q(s_2) \quad \text{while} \quad V^*(s_1) < V^*(s_2)$$In this scenario, MCTS confidently exploits the wrong branch because a shallow, suboptimal "decoy" yields a high expected reward, while the branch containing the true global optimum is penalized by a low expected reward due to the abundance of poor completions.
@@ -226,9 +355,23 @@ We isolate two potential sources of difficulty:
 
 \end{enumerate}
 
+\begin{example} The probability that the random rollout gets an optimal reward is: 
+
+$$\rho_0 (s) = \Pr_{ \pi \sim q(\cdot|s)} [R(\pi) = V^*(s)]$$
+
+\end{example}
+
+
+\noi Therefore: in any experiments, we should study 
+$$
+V^q(s), V^*(s), \rho_\varepsilon(s)
+$$
+\noi as our three primary metrics. \\ 
+
+
 \Cref{tab:failure-modes} summarizes the two mechanisms.
 
-\begin{table}[ht]
+\begin{table}[thbp!]
     \centering
     \footnotesize
     \renewcommand{\arraystretch}{1.35}
@@ -246,7 +389,7 @@ We isolate two potential sources of difficulty:
         \(V^q(s_1) > V^q(s_2)\) while \(V^*(s_1) < V^*(s_2)\)
         for sibling states \(s_1, s_2\) &
         A suboptimal branch has the higher mean rollout reward: a shallow
-        decoy looks better on average than the branch holding the optimum. &
+        decoy looks better &
         Search confidently exploits the wrong branch and starves the branch
         containing the true global optimum. \\
         \addlinespace
@@ -272,21 +415,69 @@ whether they predict the finite-budget behavior of pure MCTS.
 After identifying the difficulty in pure MCTS, how does neural net address these? 
 \end{question}
 \subsection{Empirical function space}
-
-Let
+\label{subsec:empirical_function_space}
+\noi Suppose we are given to functions $f,g:\RR \ra \RR$. 
+We want to compute the empeircal mean and variance on the set of points. 
 \[
     x_1,\ldots,x_n\in[-1,1],
     \qquad n=41,
 \]
-be equally spaced sample points, and define the empirical inner product
+
+be equally spaced sample points, 
+
+We want to comute emperical mean and or variance of \footnote{we think of these as the $y_i$s  from the target functions . }
+$$
+\crbr{f(x_i)}_{i=1}^n 
+$$ 
+
+
+We  define the empirical inner product
+
+\begin{defi}[Empirical inner product]
+Define the inner product $\anbr{-,-}_n :\RR^n \times \RR^n \ra \RR$ given by 
 \begin{equation}
-    \langle f,g\rangle_n
+    \langle (x_i),(y_i))\rangle_n
     =
-    \frac{1}{n}\sum_{i=1}^n f(x_i)g(x_i).
-    \label{eq:empirical-inner-product}
+    \frac1n\sum_{i=1}^n x_i y_i,
+\label{eq:empirical-inner-product}
 \end{equation}
-Starting from the monomials \(x,x^2,\ldots,x^{12}\), remove their empirical
-means and apply Gram--Schmidt orthogonalization, 
+\end{defi}
+
+\noi Two functions agreeing on the grid are identified, so
+\eqref{eq:empirical-inner-product} is an inner product on \(\R^n\) and every
+statement below is Euclidean geometry in \(\R^n\).  Let \(\mathbf 1\) denote
+the constant function \(1\) and write
+\begin{equation}
+    \|f\|_n^2=\langle f,f\rangle_n=\frac1n\sum_{i=1}^n f(x_i)^2,
+    \qquad
+    \overline f=\langle f,\mathbf 1\rangle_n=\frac1n\sum_{i=1}^n f(x_i),
+    \qquad
+    \operatorname{Var}_n(f)=\|f-\overline f\,\mathbf 1\|_n^2 .
+    \label{eq:norm-mean-variance}
+\end{equation}
+Three readings of these symbols are used repeatedly.
+\begin{enumerate}
+    \item \(\|f\|_n^2\) is the \emph{mean} square of \(f\) over the grid, not
+    the sum of squares; the factor \(1/n\) is what makes \(\mathbf 1\) a unit
+    vector, \(\|\mathbf 1\|_n=1\).  The two conventions differ by a constant,
+    \(\|f\|_2^2=n\|f\|_n^2\).
+    \item \(\overline f\) is at once the sample mean of \(f\) and the
+    coordinate of \(f\) along \(\mathbf 1\); hence
+    \(\overline f\,\mathbf 1\) is the orthogonal projection of \(f\) onto
+    \(\operatorname{span}\{\mathbf 1\}\), and \(f\) is centered exactly when
+    \(f\perp\mathbf 1\).
+    \item Splitting \(\R^n=\operatorname{span}\{\mathbf 1\}\oplus
+    \mathbf 1^{\perp}\) gives the Pythagorean identity
+    \begin{equation}
+        \|f\|_n^2=\overline f^{\,2}+\operatorname{Var}_n(f),
+        \label{eq:mean-variance-split}
+    \end{equation}
+    so squared norm and empirical variance coincide precisely on centered
+    functions.
+\end{enumerate}
+
+\noi Starting from the monomials \(x,x^2,\ldots,x^{12}\), remove their empirical
+means and apply Gram--Schmidt orthogonalization,
 \[
     \psi_1,\ldots,\psi_{12}
 \]
@@ -316,6 +507,22 @@ used in the motivating quadratic example.
 
 \subsection{Controlled target family}
 
+\begin{question}
+What family of target functions should we consider? 
+\begin{itemize}
+    \item What discrete set $\c{T}$ (of expressions, $\psi_1, \ldots, \psi_M$) should we consider?
+    Let suppose suppose our expressions 
+    $\c{T}$ has only 4 generators, $\psi_1, \psi_2, \psi_3, \psi_4$. 
+    $$
+\c{T} = \c{P}(\crbr{\psi_1, \psi_2, \psi_3, \psi_4})
+    $$
+    \item How should we choose the $\psi_1, \ldots, \psi_4$. 
+    We want to choose monomials $x, x^2, x^3,x^4$, however, for computational purposes, 
+    as we will require easy to compute variance, we will do some simplifications on the monomials with respect to the given dataset $\crbr{x_i}_{i=1}^n$ as an
+    input to our symbolic regression problem. The process is \Cref{subsec:empirical_function_space}. 
+\end{itemize}
+\end{question}
+
 For \(\lambda\in(0,1)\), define the four-component target
 \begin{equation}
     y_\lambda(x)
@@ -328,6 +535,10 @@ For \(\lambda\in(0,1)\), define the four-component target
     \right).
     \label{eq:target-family}
 \end{equation}
+
+\begin{thoughts}
+You can assume these $\psi_i$s  are $x^i$. 
+\end{thoughts}
 \begin{prop}[Unit target variance]
 \label{prop:target-normalization}
 For every \(\lambda\in(0,1)\),
@@ -338,6 +549,13 @@ For every \(\lambda\in(0,1)\),
     \label{eq:target-normalization}
 \end{equation}
 \end{prop}
+
+\noi In the notation \eqref{eq:norm-mean-variance}, the first identity says
+that the target has sample mean zero, equivalently that it is orthogonal to
+the constant function; the second says that its mean square over the grid is
+one.  By \eqref{eq:mean-variance-split} the two together say that the
+empirical variance of \(y_\lambda\) equals \(1\), so \(\|y_\lambda\|_n^2\) may
+be read either as a squared length or as a variance without further comment.
 
 \begin{proof}
 Both identities use only the three properties of the basis
@@ -384,6 +602,201 @@ When \(\lambda=0.997\), the first component explains \(99.7\%\) of the target
 variance and each remaining component explains \(0.1\%\).  The latter is a
 controlled analogue of a pseudo-linear target: a shallow one-term expression
 is almost perfectly predictive but is not structurally exact.
+\Cref{fig:scenario-weak,fig:scenario-strong} display the two scenarios end to
+end, from the variance ledger to the root values.
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/scenario_weak.png}
+    \caption{%
+    The weak-decoy scenario, \(\lambda_{\mathrm{weak}}=1/4\).  One colour per
+    role throughout: red is everything the decoy action \(D\) reaches, blue is
+    everything reachable only through the continue action \(C\), grey the
+    distractor atoms \(\psi_5,\ldots,\psi_M\).
+    \textbf{(a)} The controlled derivation grammar, with the exact values
+    \eqref{eq:decoy-values}, \eqref{eq:continue-vstar},
+    \eqref{eq:continue-vroll} and \eqref{eq:exact-mass} printed on the leaves;
+    \(D\) terminates immediately into \(\mathcal M_D\), while \(C\) opens the
+    four atom slots \(A_1,\ldots,A_4\) of \eqref{eq:atom-productions}.
+    \textbf{(b)} The same picture in function space: the decoy fit
+    \(\widehat y_D=\sqrt\lambda\,\psi_1\) leaves the residual
+    \(\sqrt{(1-\lambda)/3}\,(\psi_2+\psi_3+\psi_4)\), of squared length
+    \(1-\lambda=0.75\).
+    \textbf{(c)} The variance ledger \eqref{eq:atom-weight-values}: the unit
+    target variance of Proposition~\ref{prop:target-normalization} splits into
+    four equal shares, of which \(D\) can capture only the first.
+    \textbf{(d)} Root values.  The mean-rollout evaluator ranks \(C\) above
+    \(D\) at both \(M\), so it agrees with the \(V^*\) ordering and no
+    value-semantic failure occurs; only rare-event failure remains, and it is
+    governed by \(\rho_0\).
+    Generated by \texttt{figures/make\_scenario\_figures.py}.
+    }
+    \label{fig:scenario-weak}
+\end{figure}
+
+\subsection{Why the target is normalized}
+\label{subsec:why-normalize}
+
+Proposition~\ref{prop:target-normalization} is a normalization, not a
+modelling assumption.  Two elementary facts make this precise: the
+normalization costs no generality (Lemma~\ref{lem:affine-invariance}), and it
+converts the reward into an additive accounting of target variance
+(Lemma~\ref{lem:reward-is-variance}).  Throughout, \(\mathcal M\subseteq\R^n\)
+is a linear model class containing \(\mathbf 1\), \(\Pi_{\mathcal M}\) is the
+orthogonal projection onto \(\mathcal M\) in the geometry
+\eqref{eq:empirical-inner-product} --- equivalently, the least-squares fit
+\eqref{eq:least-squares-fit} --- and
+\begin{equation}
+    R(y;\mathcal M)
+    =
+    1-\frac{\|y-\Pi_{\mathcal M}y\|_2^2}
+           {\|y-\overline y\,\mathbf 1\|_2^2}
+    \label{eq:r2-abstract}
+\end{equation}
+is the unpenalized \(R^2\) reward of \eqref{eq:r2-reward}.
+
+\begin{lem}[The reward is affine-invariant]
+\label{lem:affine-invariance}
+For all \(\alpha\neq0\) and \(\beta\in\R\),
+\begin{equation}
+    R(\alpha y+\beta\mathbf 1;\mathcal M)=R(y;\mathcal M).
+    \label{eq:affine-invariance}
+\end{equation}
+\end{lem}
+
+\begin{proof}
+Since \(\Pi_{\mathcal M}\) is linear and \(\mathbf 1\in\mathcal M\), we have
+\(\Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
+=\alpha\,\Pi_{\mathcal M}y+\beta\mathbf 1\), so the residual scales by
+\(\alpha\),
+\[
+    (\alpha y+\beta\mathbf 1)-\Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
+    =
+    \alpha\left(y-\Pi_{\mathcal M}y\right).
+\]
+The centered target scales by \(\alpha\) as well, because
+\(\overline{\alpha y+\beta}=\alpha\overline y+\beta\).  Numerator and
+denominator of \eqref{eq:r2-abstract} therefore both acquire the factor
+\(\alpha^2\), which cancels.
+\end{proof}
+
+\noi Consequently the reward landscape --- and with it \(V^*\), \(V^q\) and
+\(\rho_\varepsilon\) at every state of the search tree --- is constant on each
+affine family \(\{\alpha y+\beta\mathbf 1:\alpha\neq0,\ \beta\in\R\}\).  Every
+nonconstant family contains exactly two centered unit-norm representatives,
+\(\pm(y-\overline y\,\mathbf 1)/\sqrt{\operatorname{Var}_n(y)}\), and
+\eqref{eq:target-family} selects one of them.  Normalizing is thus a choice of
+coordinates on an equivalence class, and it buys the following identity.
+
+\begin{lem}[The reward is captured variance]
+\label{lem:reward-is-variance}
+Suppose \(\overline y=0\) and \(\|y\|_n=1\), and let
+\(\{\mathbf 1,\phi_1,\ldots,\phi_k\}\) be an orthonormal basis of
+\(\mathcal M\) in the geometry \eqref{eq:empirical-inner-product}.  Then
+\begin{equation}
+    R(y;\mathcal M)
+    =
+    1-\|y-\Pi_{\mathcal M}y\|_n^2
+    =
+    \|\Pi_{\mathcal M}y\|_n^2
+    =
+    \sum_{i=1}^{k}\langle y,\phi_i\rangle_n^{2}
+    \;\in[0,1].
+    \label{eq:reward-is-variance}
+\end{equation}
+\end{lem}
+
+\begin{proof}
+The two norms differ by a constant, \(\|\cdot\|_2^2=n\|\cdot\|_n^2\), so the
+factor \(n\) cancels in \eqref{eq:r2-abstract}; since \(\overline y=0\) the
+denominator is \(n\|y\|_n^2=n\), which gives the first equality.  The residual
+is orthogonal to \(\mathcal M\), hence to \(\Pi_{\mathcal M}y\), so
+Pythagoras gives
+\(1=\|y\|_n^2=\|\Pi_{\mathcal M}y\|_n^2+\|y-\Pi_{\mathcal M}y\|_n^2\), which
+is the second.  Expanding the projection in the orthonormal basis and using
+\(\langle y,\mathbf 1\rangle_n=\overline y=0\) leaves
+\(\Pi_{\mathcal M}y=\sum_{i}\langle y,\phi_i\rangle_n\phi_i\), and Parseval
+gives the third.  Finally
+\(0\leq\|\Pi_{\mathcal M}y\|_n^2\leq\|y\|_n^2=1\).
+\end{proof}
+
+\noi Write
+\begin{equation}
+    w_m=\langle y_\lambda,\psi_m\rangle_n^{2},
+    \qquad m=1,\ldots,M,
+    \label{eq:atom-weights}
+\end{equation}
+for the share of target variance carried by the \(m\)th atom.  In this
+notation Proposition~\ref{prop:target-normalization} states exactly that
+\begin{equation}
+    w=\left(
+        \lambda,\ \tfrac{1-\lambda}{3},\ \tfrac{1-\lambda}{3},
+        \ \tfrac{1-\lambda}{3},\ 0,\ldots,0
+      \right)
+    \qquad\text{is a probability vector on }\{1,\ldots,M\},
+    \label{eq:atom-weight-values}
+\end{equation}
+and Lemma~\ref{lem:reward-is-variance}, applied to the model class
+\eqref{eq:terminal-model-space}, reads
+\begin{equation}
+    R(\mathbf j)=w\bigl(J(\mathbf j)\bigr)=\sum_{m\in J(\mathbf j)}w_m .
+    \label{eq:reward-is-coverage}
+\end{equation}
+The reward of a terminal expression is the \(w\)-measure of the set of atoms
+it selects.  This is \eqref{eq:analytic-terminal-reward}, and it is what the
+normalization is for.  Four consequences are used throughout.
+
+\begin{enumerate}
+    \item \emph{The design parameter is the decoy reward.}  For the
+    unnormalized target \(\sqrt\lambda\,\psi_1+c(\psi_2+\psi_3+\psi_4)\) the
+    decoy captures the fraction \(\lambda/(\lambda+3c^2)\).  Only the
+    constraint \(\lambda+3c^2=1\) makes the coefficient we set equal to the
+    number we compare, so that \(R(D)=\lambda\)
+    (Proposition~\ref{prop:decoy-reward}) and the inversion condition reads
+    \(\lambda>p_M\) in \eqref{eq:inversion-condition} with no conversion
+    factor.  Had \(\|y_\lambda\|_n\) drifted with \(\lambda\), turning the
+    decoy knob would also have rescaled every reward, confounding the
+    value-semantic effect with a scale effect.
+
+    \item \emph{One absolute reward scale across the four cells.}  By
+    \eqref{eq:reward-is-variance}, \(R\in[0,1]\) with \(R=1\) if and only if
+    \(J(\mathbf j)\supseteq\{1,2,3,4\}\), so exact recovery is a reward value
+    rather than a tolerance, and simple regret \(r_B=1-R_B^{\max}\) is the
+    unexplained share of target variance.  In particular
+    \(1-\lambda_{\mathrm{strong}}=0.003\) is literally \(0.3\%\) of the target
+    variance.  Cells differing in \(\lambda\) and \(M\) are therefore compared
+    on the same axis, and the UCT bonus in \eqref{eq:mean-uct}, whose
+    constant is the Hoeffding deviation for rewards supported in \([0,1]\),
+    is admissible in all of them without recalibration.
+
+    \item \emph{Exact statistics become counting.}  Because
+    \eqref{eq:reward-is-coverage} is additive in the selected atoms, taking
+    expectations reduces \(V^q\) to four marginal inclusion probabilities;
+    this is precisely the proof of
+    Proposition~\ref{prop:continue-values}, and it requires neither sampling
+    nor fitting.  The same identity is what the \(10^{-12}\) agreement
+    between the analytic and least-squares evaluators tests, the denominator
+    of \eqref{eq:r2-reward} being the constant \(n\) rather than a fitted
+    quantity.
+
+    \item \emph{Centering is what makes ``variance share'' true.}  Since
+    \(\overline y_\lambda=0\) and every model class considered contains
+    \(\mathbf 1\), the intercept vanishes identically, least squares reduces
+    to coordinatewise projection onto the selected \(\psi_j\), and
+    \(\|y_\lambda\|_n^2=\operatorname{Var}_n(y_\lambda)\) by
+    \eqref{eq:mean-variance-split}.  Without centering, the \(R^2\)
+    denominator would no longer be \(\|y_\lambda\|_n^2\) and \(\lambda\) would
+    not be the fraction of variance explained by \(\psi_1\).
+\end{enumerate}
+
+\begin{rem}
+Lemma~\ref{lem:affine-invariance} also delimits the claim.  Normalization
+fixes bookkeeping, not difficulty: it changes no reward, no ordering and no
+completion probability.  The controlled family \eqref{eq:target-family} is
+therefore not a special case but a canonical representative, and the secondary
+validation on centered, variance-normalized quadratic targets tests the same
+reward landscape as the raw ones.
+\end{rem}
 
 \subsection{Controlled derivation grammar}
 
@@ -572,6 +985,30 @@ Consequently, all rewards lie in \([0,1]\), distractor atoms
 \(\psi_5,\ldots,\psi_M\) capture no target variance, and the exact reward is
 independent of numerical fitting pathologies.
 
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/scenario_strong.png}
+    \caption{%
+    The strong-decoy scenario, \(\lambda_{\mathrm{strong}}=0.997\).  Colours
+    and panels are as in \cref{fig:scenario-weak}; only \(\lambda\) has
+    changed, and by Lemma~\ref{lem:affine-invariance} nothing else about the
+    environment has been rescaled.
+    \textbf{(b)} The decoy fit is now visually indistinguishable from the
+    target and the residual is flat at the plotting scale, yet it is not zero:
+    \(\|y_\lambda-\widehat y_D\|_n^2=1-\lambda=0.003\).  This is the
+    pseudo-linear regime, where near-perfect prediction coexists with
+    structural error.
+    \textbf{(c)} The decoy now captures \(99.7\%\) of the unit variance, and
+    the three shares reachable only through \(C\) are \(0.1\%\) each.
+    \textbf{(d)} The mean-rollout evaluator reverses the correct ordering at
+    both \(M\), since \(R(D)=0.997>p_M\) while \(V^*(D)=0.997<V^*(C)=1\);
+    this is the value-semantic failure of \cref{tab:failure-modes} and the
+    exact trap of Remark~\ref{rem:decoy-trap}.
+    }
+    \label{fig:scenario-strong}
+\end{figure}
+
+
 \subsection{Exact completion statistics}
 
 Let \(D\) and \(C\) denote the root children corresponding to the decoy and
@@ -755,10 +1192,27 @@ is conditional on repeatedly sampling the continue branch.
 
 \section{Experiment 1: exact value-semantic audit}
 
-\paragraph{Question.}
-Does mean random-completion return preserve the ordering induced by
-best-achievable reward, and how rare is the exact expression within each
-partial derivation?
+
+\begin{question} 
+    \noi What is the relation between these two values and running MCTS in practice? 
+
+    \begin{enumerate}
+        \item Does mean random-completion return preserve the ordering induced by
+best-achievable reward 
+i.e  $V^q $ and $V^*$ rank the states correctly ? 
+\item 
+ and how rare is the exact expression within each
+partial derivation? 
+$$\rho_\varepsilon$$ 
+
+    \end{enumerate}
+\end{question}
+
+\noi The steps of the full experiment: 
+\begin{enumerate}
+    \item Define family $y_\lambda$. 
+    \item Plot the values of primary outputs.
+\end{enumerate}
 
 \paragraph{Hypothesis 1.}
 The rollout mean ranks the continue branch above the decoy for
