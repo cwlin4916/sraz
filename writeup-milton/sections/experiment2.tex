@@ -1,0 +1,168 @@
+% Experiment 2 --- extracted from writeup.tex.
+% This is an \input fragment: it relies on the parent document's preamble
+% (macros \EE, \c, \boxed, cite keys, enumitem/amsmath) and has no \documentclass.
+% Re-enable in the main writeup by uncommenting the \input{sections/experiment2} line.
+
+\section*{Experiment 2 \quad How informative are partial symbolic states?}
+
+\section{Formalizing informativeness}
+
+Fix a rollout policy $q$, initially uniform over legal actions. Starting from
+state $s$, this policy induces a distribution over terminal rewards,
+$Z_s=R(\Pi)$ with $\Pi\sim q(\cdot\mid s)$. There are several fundamentally
+different summaries of $Z_s$.
+
+\paragraph{Mean completion value.} $\boxed{\;\mu(s)=\EE[Z_s].\;}$ How good is a
+\emph{typical} random completion? This does not say whether one excellent
+completion is reachable.
+
+\paragraph{Optimal reachable value.}
+$\boxed{\;V^*(s)=\sup\operatorname{supp}(Z_s)=\max_{\pi\in\c E(s)}R(\pi).\;}$
+How good is the \emph{best} completion?
+
+\paragraph{Probability of discovering a good completion.} For threshold $\tau$,
+$\boxed{\;p_\tau(s)=\Pr(Z_s\ge\tau).\;}$ Under independent random completions the
+expected number of attempts to hit the threshold is approximately $1/p_\tau(s)$,
+often more operationally meaningful than the mean.
+
+\paragraph{Maximum of $K$ rollouts.} Given returns $Z_{s,1},\ldots,Z_{s,K}$,
+$\boxed{\;\widehat M_K(s)=\max_{1\le j\le K}Z_{s,j}.\;}$ This is \emph{not} an
+unbiased estimator of $V^*(s)$; it estimates a budget-dependent extreme value,
+and its quality depends strongly on the probability of sampling a near-optimal
+completion.
+
+\paragraph{Upper-tail mean.} Let $Z_{s,(1)}\le\cdots\le Z_{s,(K)}$ be the ordered
+returns and $m=\lceil\varepsilon K\rceil$. Define
+\[
+  \boxed{\; \widehat U_{\varepsilon,K}(s)
+    = \frac1m\sum_{j=K-m+1}^K Z_{s,(j)}. \;}
+\]
+This empirical upper-tail conditional expectation---a reward-oriented analogue of
+upper CVaR---interpolates between the mean ($\varepsilon=1$) and the maximum
+($m=1$). Risk-seeking symbolic regression~\cite{petersen2021deep} uses this idea
+because the objective is to generate a few exceptional expressions rather than to
+improve the mean sampled expression. A recent symbolic-regression MCTS
+preprint~\cite{huang2025mctssr} similarly frames the problem as extreme rather
+than average reward allocation, though its results should be treated as preprint
+evidence.
+
+\section{Hypotheses}
+
+\begin{description}[leftmargin=2.6em, style=nextline]
+  \item[H2.1 (positive-control informativeness).] In the additive grammar, the
+  random-completion mean should be positively associated with $V^*$, because
+  adding useful terms does not introduce division or nonlinear fitting failures.
+  \item[H2.2 (deceptive-state failure).] In the full grammar on \texttt{quad\_B},
+  $\operatorname{Corr}(\mu(s),V^*(s))$ will be much lower: states containing rare
+  exact completions can have poor mean rollout value because most completions hit
+  the $-1$ floor.
+  \item[H2.3 (upper-tail advantage).] At matched rollout budget $K$, an
+  upper-tail estimator will produce lower action-selection regret than the mean,
+  $\EE[r_{\mathrm{sibling}}(U_{\varepsilon,K})]<\EE[r_{\mathrm{sibling}}(\mu_K)]$.
+  \item[H2.4 (offline-to-online validity).] An estimator is useful only if lower
+  offline decision regret predicts lower MCTS simple regret under a fixed
+  computation budget.
+\end{description}
+
+\section{Stage 1: exact state census}
+
+Use the same two environments E1 and E2. For every state $s$, store its
+derivation depth, current token length, number of nonterminals, number of legal
+actions, remaining token capacity, $V^*(s)$, $Q^*(s,a)$ for every legal action,
+the number of reachable terminal expressions, and the fraction of reachable
+terminals at the $-1$ floor. For E1, analyze every state. For E2, compute $V^*$
+for every state by dynamic programming, but it is acceptable to perform repeated
+rollout diagnostics on a fixed stratified sample---for example $250$ states per
+depth stratum, up to about $2{,}000$ states. Do not sample states solely by
+random trajectories: that distribution overweights states that are easy to reach
+under the random policy and can hide difficult but important regions of the tree.
+
+\section{Stage 2: offline estimator comparison}
+
+For each selected state, use $K\in\{4,16,64\}$ rollouts and repeat $50$ times with
+independent seeded streams. Compute the sample mean $\widehat\mu_K$, the top-$25\%$
+mean $\widehat U_{0.25,K}$, the rollout maximum $\widehat M_K$, and the empirical
+success probability
+\[
+  \widehat p_{0.999}(s)=\frac1K\sum_{j=1}^K\mathbf 1\{Z_{s,j}\ge 0.999\}.
+\]
+
+\subsection{Global ranking measures}
+Report $\operatorname{Spearman}(\widehat v(s),V^*(s))$ and top-decile recall,
+\[
+  \frac{\bigl|\operatorname{Top}_{10\%}(\widehat v)\cap\operatorname{Top}_{10\%}(V^*)\bigr|}
+       {\bigl|\operatorname{Top}_{10\%}(V^*)\bigr|}.
+\]
+
+\subsection{Sibling decision regret}
+Global correlation is not the primary metric: MCTS must choose between legal
+children of the same state. For estimator $\widehat v$, define
+$\widehat a(s)=\arg\max_{a\in A(s)}\widehat v(T(s,a))$ and
+\[
+  \boxed{\; r_{\mathrm{sibling}}(s;\widehat v)=V^*(s)-Q^*\bigl(s,\widehat a(s)\bigr). \;}
+\]
+Average sibling regret directly measures whether the estimator would make the
+correct local search decision.
+
+\subsection{Stratified reporting}
+Report all metrics by depth, remaining token capacity, branching factor,
+$V^*(s)$, failure-floor probability and near-optimal completion probability. A
+single aggregate correlation can otherwise hide the fact that an estimator is
+useful near the root but useless in deeper states, or vice versa.
+
+\section{Why the current max-of-random proxy is insufficient}
+
+The current proxy script estimates ``best achievable'' by taking the maximum of
+$80$ random completions and correlates it with the mean of $24$ other
+completions. The two samples are separate, so it is not literally reusing the
+same returns; nevertheless both quantities are governed by the same rollout
+distribution. If an optimal completion is extremely rare, neither sample may
+encounter it, and then $\max_{j\le 80}Z_{s,j}\ll V^*(s)$. The script can
+therefore conclude that the mean accurately predicts ``best achievable'' when
+both estimators are merely blind to the same rare optimum. The exact-enumeration
+oracle is the appropriate ground truth.
+
+\section{Stage 3: insert the estimators into MCTS}
+
+Hold fixed the policy prior (uniform), edge backup (mean), exploration constant,
+number of simulations, root noise (off), action-selection temperature (zero) and
+$K=16$ completions per newly expanded leaf. Compare leaf estimators:
+\begin{enumerate}[nosep]
+  \item mean of $16$ rollouts;
+  \item top four of $16$ rollouts;
+  \item maximum of $16$ rollouts;
+  \item exact $V^*$ oracle, as an unattainable ceiling.
+\end{enumerate}
+Use $N_{\mathrm{sim}}\in\{16,64\}$ and $50$ evaluation seeds per cell. Because
+every empirical method uses exactly $16$ completions at each expanded leaf, their
+dominant evaluation cost is matched.
+
+\paragraph{Primary outcomes.} Report
+$r_B=V^*(s_0)-\max_{\pi\in\c E_B}R(\pi)$, exact-recovery rate, terminal
+evaluations to first optimum, and distinct expressions explored.
+
+\paragraph{Success criterion.} An upper-tail estimator succeeds only if (i) it has
+lower offline sibling regret, (ii) it lowers online search simple regret,
+(iii) its benefit is not explained merely by doing more work, and (iv) it remains
+reasonably stable across seeds. Filtering more aggressively is not itself evidence
+of informativeness; a maximum estimator can be highly variable and optimistically
+biased.
+
+\section{Stage 4: backup rules as a separate experiment}
+
+The current code has two distinct aggregation points: \texttt{rollout\_mode}, how
+terminal completions at a new leaf are aggregated, and \texttt{backup\_rule}, how
+repeated values traversing an edge are aggregated. These must not be changed
+simultaneously. After choosing one leaf estimator, compare mean, max, top-$k$ and
+softmax backups. For values $z_1,\ldots,z_n$, the softmax backup can be written
+\[
+  B_\tau(z_1,\ldots,z_n)
+    = z_{\max}+\tau\log\!\left[\frac1n\sum_{i=1}^n
+        \exp\!\left(\frac{z_i-z_{\max}}{\tau}\right)\right],
+\]
+which approaches the maximum as $\tau\to 0$ and the average at larger $\tau$.
+Backup operators materially affect finite-budget
+MCTS~\cite{khandelwal2016backup,dam2024power}. Because symbolic regression aims to
+return one good expression rather than to maximize cumulative reward, final
+performance should be reported in terms of simple regret or the probability of
+identifying an $\varepsilon$-optimal expression~\cite{zhao2023simple}.

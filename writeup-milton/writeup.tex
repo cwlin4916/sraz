@@ -1,0 +1,1820 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- Encoding & Fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% --- Layout & Formatting ---
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}   % Professional tables
+\usepackage{array}      % >{\raggedright\arraybackslash}p{...} columns
+\usepackage{enumitem}   % Custom lists
+\usepackage{xcolor}     % Colors
+
+% in the preamble
+\usepackage{graphicx}
+\usepackage{tikz-cd}
+% --- Math Packages ---
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{stmaryrd} % for \llbracket and \rrbracket
+\usepackage{amsthm}     % <--- ADDED: Required for theorem environments
+\usepackage[most]{tcolorbox}  % colored callout boxes (boxed `question' env)
+
+% --- Bibliography ---
+% Use BibTeX via \bibliography{...} (not biblatex/\printbibliography)
+\usepackage{cite}
+
+% --- Hyperlinks (Load last) ---
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\usepackage[nameinlink,capitalise]{cleveref}
+
+% --- Theorem Environments Setup ---
+% \theoremstyle{definition} makes the body text upright (not italic).
+% If you remove this line, LaTeX defaults to italics for theorems.
+\theoremstyle{definition}
+
+% Defined environments:
+\newtheorem{thm}{Theorem}[section] % Numbered by section (e.g., Theorem 1.1)
+\newtheorem{lem}[thm]{Lemma}       % Shares counter with Theorem (e.g., Lemma 1.2)
+\newtheorem{rem}[thm]{Remark}      % Shares counter with Theorem
+\newtheorem{example}[thm]{Example}
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{defi}[thm]{Definition}
+\newtheorem{question}[thm]{Question}
+\newtheorem{hypothesis}[thm]{Hypothesis}
+
+% --- Boxed "question" environment (visual \boxed{} for questions) ---
+% Wraps the existing amsthm `question' env in a tcolorbox; usage is unchanged:
+%   \begin{question} ... \end{question}
+\tcolorboxenvironment{question}{
+  enhanced jigsaw,
+  breakable,
+  colback=blue!5,
+  colframe=blue!55,
+  boxrule=0.6pt,
+  arc=2pt,
+  left=8pt, right=8pt, top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt,
+}
+
+% --- Unnumbered "thoughts" environment (gray aside; de-emphasized, never referenced) ---
+\newtheorem*{thoughts}{Thoughts}
+\tcolorboxenvironment{thoughts}{
+  enhanced jigsaw,
+  breakable,
+  colback=black!4,
+  colframe=black!30,
+  coltext=black!55,
+  boxrule=0.6pt,
+  arc=2pt,
+  left=8pt, right=8pt, top=6pt, bottom=6pt,
+  before skip=10pt, after skip=10pt,
+}
+
+% --- cleveref names (for \autoref / \cref-style references) ---
+\crefname{example}{example}{examples}
+\Crefname{example}{Example}{Examples}
+% --- Custom Commands ---
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\Simplex}{\Delta^{d-1}}
+\newcommand{\Dist}{\Delta}   % \Dist(S): probability distributions on the set S
+\newcommand{\noi}{\noindent}
+\newcommand{\oracle}{\text{oracle}}
+\newcommand{\agent}{\text{agent}}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\bb}[1]{\mathbb{#1}}
+% \AA, \BB, ..., \ZZ -> \mathbb{A}, ..., \mathbb{Z}
+% NB: overrides kernel \AA (Å) and \SS (ß); neither is used in this project.
+\makeatletter
+\@for\@bbletter:=A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z\do{%
+  \expandafter\edef\csname\@bbletter\@bbletter\endcsname{%
+    \noexpand\mathbb{\@bbletter}}%
+}
+\makeatother
+%brackets
+\newcommand{\anbr}[1]{\left\langle #1 \right\rangle}
+\newcommand{\crbr}[1]{\left \{ #1 \right \} }
+\newcommand{\smbr}[1]{\left( #1 \right) }
+\newcommand{\sqbr}[1]{\left [ #1 \right ] }
+% \c is \mathcal in math mode but keeps its kernel meaning (cedilla accent,
+% e.g. Fran\c{c}a in the bibliography) in text mode.
+\let\cedillaaccent\c
+\renewcommand{\c}{\ifmmode\expandafter\mathcal\else\expandafter\cedillaaccent\fi}
+
+%commenting
+\newcommand{\milton}[1]{\textcolor{blue!55}{[milton: #1]}}
+
+\usepackage{listings}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{xcolor}
+
+% Setup for BNF Grammar
+\lstdefinelanguage{BNF}{
+  morekeywords={::=, |},
+  sensitive=true,
+  morestring=[b]",
+}
+
+\lstset{
+  language=BNF,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  stringstyle=\color{red},
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showstringspaces=false
+}
+
+\lstdefinestyle{dslstyle}{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{red},
+    commentstyle=\color{gray}\itshape,
+    morekeywords={if, then, else, pos, vel, ang, ang_vel, Left, Right},
+    mathescape=true,
+    frame=single,
+    xleftmargin=1em,
+}
+
+
+
+% Add this to your preamble
+\lstdefinelanguage{PDDL}{
+  morekeywords={define, domain, problem, :requirements, :types, :constants, :predicates, :action, :parameters, :precondition, :effect, and, not, =, forall, when, :domain, :init, :goal, :situation, :objects},
+  sensitive=false,
+  morecomment=[l]{;},
+  stringstyle=\color{red},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{purple}\bfseries,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray}
+}
+
+
+\title{A Controlled Study of Pure Monte Carlo Tree Search for Symbolic Regression}
+\author{After conversations with GPT}
+\date{\today}
+
+\begin{document}
+\maketitle
+\setlength{\emergencystretch}{3em}  % absorb long \texttt{} tokens without margin overflow
+
+\section{A controlled study of pure Monte Carlo tree search for symbolic regression}
+\label{sec:pure-mcts-study}
+
+\subsection{Problem state for symbolic regression}
+
+\begin{question}
+What is our problem set up? 
+\end{question}
+Suppose $(x_i,y_i)$ are a set of points generated from an expression 
+$$
+h(x_i)=y_i 
+$$
+\noi for a fixed expression $h$ (unknown), $h$ is a quadratic equation.  \\ 
+
+The object being optimized: is the discrete set of symbolic strucutres, over $$\c{T}= \c{P}(\crbr{1,x,x^2})$$.  \\ 
+
+
+\noi Symbolic regression search of the structures $\tau$: 
+\noi We have an expression : 
+$$
+\tau_\beta(x) = \beta_ 0 + \beta_1(x) + \beta_2 x^2 
+$$
+
+\noi we have the variables $1,x,x^2$ (discrete set) , $\beta=(\beta_1,\beta_2,\beta_3)$  are continuous.
+ 
+We will fit 
+$$
+\hat{\beta}_\tau = \arg\min _\beta \frac{1}{n} \sum_{i=1}^n (y_i -\tau_\beta(x_i))^2 
+$$
+
+\noi Symbolic search find all $\tau \in \c{T}$ (structures) 
+$$
+\tau^* = \arg \min _{\tau \in \c{T}} R(\tau, \widehat{\beta}_\tau )
+$$
+\noi where $R$ is $R^2$ (why? ) 
+
+
+\begin{question}
+    What simplifications should we make to see the impact of MCTS? 
+\end{question}
+\noi Some simplification we should make in the first experimental design: 
+
+\begin{itemize}
+    \item no variable length trees. 
+    \item no invalid expressions. 
+    \item no noise. 
+    \item no complex penalty. 
+    \item no additional operator. 
+    \item No neural policy or value network. 
+\end{itemize}
+
+\noi So we pretty much turn the problem into a \textit{subset selection}
+
+The purpose of this study is to characterize the finite-budget limitations of
+pure Monte Carlo tree search (MCTS) in grammar-based symbolic regression.
+We deliberately exclude neural policy and value networks.  The neural-guidance
+question is scientifically separate: before asking whether a network improves
+search, one must determine what information the underlying pure-search
+procedure estimates and when that information is aligned with symbolic
+optimization.
+
+
+
+\subsection{The derivation MDP}
+\label{subsec:derivation-mdp}
+
+\begin{question}
+What exactly is the Markov decision process that the search runs on?
+\end{question}
+
+\noi Everything below \eqref{eq:vstar} presumes a state space of partial
+derivations, a legal-action set, a deterministic transition and a reward that
+arrives only at termination.  We now fix those objects, because the
+implementation we audit realizes them concretely and the realization is not
+quite the idealization.
+
+\paragraph{States.}
+A state is a \emph{sentential form}: a finite string over the grammar's
+alphabet, some of whose symbols are nonterminals.  Write
+\begin{equation}
+    \c{S}
+    =
+    \crbr{
+        s \in \Sigma^{\le L-1}
+    },
+    \qquad
+    s_0 = S,
+    \label{eq:mdp-states}
+\end{equation}
+where \(\Sigma\) is the symbol alphabet, \(S\) the start symbol and \(L\) a
+token budget.  The implementation stores \(s\) as a fixed-length buffer of
+\(L\) integers padded on the right, together with the count of occupied slots;
+the pad symbol is what makes the observation space a fixed-shape array rather
+than a variable-length string.  A state is terminal exactly when it contains
+no nonterminal.
+
+\paragraph{Actions.}
+An action names \emph{which} nonterminal to rewrite and \emph{how}:
+\begin{equation}
+    \c{A}(s)
+    =
+    \crbr{
+        (i,p)
+        \;:\;
+        s_i \in \c{N},\;
+        p \in \mathrm{Prod}(s_i),\;
+        |s| + |\mathrm{rhs}(p)| - 1 < L
+    },
+    \label{eq:mdp-actions}
+\end{equation}
+with \(\c{N}\) the nonterminals and \(\mathrm{Prod}(A)\) the productions of
+\(A\).  Pairs are flattened to a single index \(a = iP + p\), where \(P\) is
+the total number of productions, so the action space is
+\(\{0,\dots,LP-1\}\) with \eqref{eq:mdp-actions} supplied as a Boolean mask.
+Two features of \eqref{eq:mdp-actions} are easy to miss.  First, the length
+test is strict, so a finished expression has at most \(L-1\) tokens: the
+budget \(L\) is one token larger than the longest reachable expression.
+Second, the position \(i\) is chosen by the agent.  The derivation order is
+therefore \emph{not} fixed, and \(|\c{A}(s)|\) grows with the number of open
+nonterminals rather than being a constant \(|\mathrm{Prod}|\); the six states
+of \cref{fig:mdp-derivation}(a) have
+\(|\c{A}| = 4, 8, 12, 8, 4, 0\).
+
+\paragraph{Transition.}
+Rewriting is splicing, and it is deterministic:
+\begin{equation}
+    T\bigl(s,(i,p)\bigr)
+    =
+    s_{0:i}
+    \cdot
+    \mathrm{rhs}(p)
+    \cdot
+    s_{i+1:|s|}.
+    \label{eq:mdp-transition}
+\end{equation}
+Every step either lengthens the buffer or closes one nonterminal without
+lengthening it, so an episode terminates in at most \(2L\) steps.
+
+\paragraph{Reward.}
+Intermediate rewards vanish.  A terminal string \(\pi\) is read as a
+prefix-notation expression whose \(\texttt{C}_k\) tokens are free constants;
+those constants are fitted to the data by least squares and the reward is the
+resulting coefficient of determination,
+\begin{equation}
+    R(\pi)
+    =
+    \operatorname{clip}_{[-1,1]}
+    \Bigl(
+        1 - \tfrac{\mathrm{SS}_{\mathrm{res}}(\pi)}{\mathrm{SS}_{\mathrm{tot}}}
+    \Bigr),
+    \qquad
+    R(s) = 0 \text{ for } s \text{ nonterminal}.
+    \label{eq:mdp-reward}
+\end{equation}
+The clip is not cosmetic: it is what stops an unparseable or singular
+expression from returning \(-\infty\) and poisoning every value that backs up
+through it.  It also means the reward range is \([-1,1]\), not the \([0,1]\)
+that \eqref{eq:reward-is-variance} arranges for the controlled family.
+
+\paragraph{Completion policy and budget.}
+The rollout policy is uniform on \eqref{eq:mdp-actions},
+\(q(a \mid s) = 1/|\c{A}(s)|\), and since \eqref{eq:mdp-transition} is
+deterministic it induces \(q(\cdot \mid s) \in \Dist(\c{E}(s))\) exactly as in
+\eqref{eq:vroll}.  Note that this is uniform on \emph{pairs}: a form with two
+open nonterminals splits its mass across positions, so \(q\) is not the
+per-slot uniform law of \eqref{eq:atom-productions}.  One simulation performs
+one terminal evaluation, so the budget \(B\) of \eqref{eq:budget-grid} is the
+simulation count of a single persistent root search --- measured, \(B\)
+simulations at one completion per expanded leaf cost exactly \(B+1\) terminal
+evaluations, the extra one being the root expansion.
+
+\Cref{tab:mdp-components} collects the seven components and their
+realization.
+
+\begin{table}[thbp!]
+    \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{1.30}
+    \begin{tabular}{@{}
+        >{\raggedright\arraybackslash}p{1.75cm}
+        >{\raggedright\arraybackslash}p{4.55cm}
+        >{\raggedright\arraybackslash}p{7.95cm}
+        @{}}
+        \toprule
+        \textbf{Component} & \textbf{Formal object} &
+        \textbf{Realization} \\
+        \midrule
+        State &
+        sentential form \(s \in \c{S}\), \eqref{eq:mdp-states};
+        \(s_0 = S\) &
+        length-\(L\) integer buffer, right-padded, plus an occupied-slot
+        count.  Terminal iff no nonterminal remains \\
+        \addlinespace
+        Action &
+        \((i,p)\): position and production, \eqref{eq:mdp-actions};
+        flattened to \(a = iP+p\) &
+        \(\{0,\dots,LP-1\}\) with a Boolean legality mask.  The agent chooses
+        \emph{which} nonterminal to expand, so the derivation order is free \\
+        \addlinespace
+        Transition &
+        \(T(s,(i,p))\), splice, \eqref{eq:mdp-transition};
+        deterministic &
+        in-place buffer splice; the strict length test in
+        \eqref{eq:mdp-actions} caps finished expressions at \(L-1\) tokens \\
+        \addlinespace
+        Reward &
+        \(0\) on nonterminals; \(R(\pi)\) at a leaf,
+        \eqref{eq:mdp-reward} &
+        prefix \(\to\) infix \(\to\) symbolic parse \(\to\) least-squares fit
+        of the free constants \(\to\) \(R^2\), clipped to \([-1,1]\); any
+        failure scores \(-1\).  Memoized per expression string \\
+        \addlinespace
+        Termination &
+        \(\c{A}(s) = \emptyset\) &
+        no nonterminal in the occupied prefix; at most \(2L\) steps \\
+        \addlinespace
+        Completion policy &
+        \(q(a\mid s) = 1/|\c{A}(s)|\) &
+        uniform over the flattened mask, i.e.\ over \emph{pairs}
+        \((i,p)\) and not over the productions of one designated slot \\
+        \addlinespace
+        Budget &
+        \(B\) terminal evaluations, \eqref{eq:budget-grid} &
+        \(B\) simulations of one persistent root search, one completion per
+        expanded leaf: exactly \(B+1\) evaluations \\
+        \bottomrule
+    \end{tabular}
+    \caption{%
+    The seven components of the derivation MDP and how each is realized.  The
+    three entries that do not simply instantiate the formalism --- a free
+    derivation order, a reward on \([-1,1]\) rather than \([0,1]\), and a
+    completion law uniform over position--production pairs --- are the ones
+    \cref{rem:formalism-vs-implementation} takes up.
+    }
+    \label{tab:mdp-components}
+\end{table}
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mdp_derivation.png}
+    \caption{%
+    The derivation MDP on the additive-quadratic instance, target
+    \(y = c_0 + c_1 x + c_2 x^2\) on \(41\) points of \([1,3]\), token budget
+    \(L=12\).  Colours follow \cref{fig:scenario-weak}: red is the shallow
+    branch with the highest reachable reward, blue the compositional branch
+    that contains the optimum, grey the remaining shallow branches.
+    \textbf{(a)} One episode: the token buffer of \eqref{eq:mdp-states}
+    rewritten by the splice \eqref{eq:mdp-transition}, with the flat action
+    index, its decoding into \((\text{position},\text{production})\), and
+    \(|\c{A}(s_k)|\) at each step.  Note that \(|\c{A}|\) rises to \(12\) and
+    falls back: it counts open nonterminals, not productions.
+    \textbf{(b)} The exact census.  Enumerating all \(4{,}898\) mask-reachable
+    sentential forms gives \(V^*\), \(V^q\) and \(\rho_0\) of
+    \eqref{eq:experiment-one-quantities} at every state without sampling.
+    The three shallow branches each hold one terminal, so \(V^q = V^*\) there;
+    the compositional branch holds \(405{,}778\).
+    \textbf{(c)} The reward \eqref{eq:mdp-reward} in data space: the best
+    one-term expression reaches \(R^2 = 0.9831\) on a structurally wrong form,
+    which is the exact trap of \cref{rem:decoy-trap} arising unprompted.
+    \textbf{(d)} The hit curve \eqref{eq:hit-probability} at the measured
+    \(\rho_0\).
+    Generated by \texttt{figures/make\_mdp\_figures.py}.
+    }
+    \label{fig:mdp-derivation}
+\end{figure}
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mcts_expansion.png}
+    \caption{%
+    The same environment searched by pure MCTS --- uniform prior, one random
+    completion per expanded leaf, mean backup --- from a single persistent
+    root, at budgets \(B \in \{8,32,128\}\).
+    \textbf{(a)--(c)} The tree actually built.  Edge width is the visit count
+    \(N(s,a)\); the labels are read off the search, not assigned.
+    \textbf{(d)} The visit share of each root action.  It moves the wrong way:
+    the branch containing the optimum takes \(0.875\) of the budget at
+    \(B=8\) and only \(0.25\) at \(B=128\), while the shallow decoy climbs to
+    \(0.68\).
+    \textbf{(e)} Why.  The exploitation statistic \(\overline Q_B\) converges
+    to \(V^q\), not \(V^*\), and here
+    \(V^q(D) = 0.983 > V^q(C) = 0.885\) while
+    \(V^*(D) = 0.983 < V^*(C) = 1\): the value-semantic failure of
+    \cref{tab:failure-modes}, measured rather than constructed.
+    \textbf{(f)} The consequence.  The best expression observed is
+    \(0.998597\) at every budget --- the search never recovers the exact
+    three-term form, so simple regret is small while exact recovery fails,
+    the separation \eqref{eq:simple-regret} is designed to expose.
+    Generated by \texttt{figures/make\_mdp\_figures.py}.
+    }
+    \label{fig:mcts-expansion}
+\end{figure}
+
+\begin{rem}[Where the formalism and the implementation diverge]
+\label{rem:formalism-vs-implementation}
+Three of the seven rows of \cref{tab:mdp-components} are not instantiations of
+the formalism but departures from it, and each one has a consequence for the
+experiments.
+\begin{enumerate}
+    \item \emph{The derivation order is free.}  The controlled grammar of
+    \eqref{eq:atom-productions} fills four labelled slots, so a completion is
+    a tuple \(\mathbf j\) and the uniform law factorizes.  Here the agent
+    also chooses \(i\), so \(|\c{A}(s)|\) is state-dependent and \(q\) does
+    not factorize.  \(V^q\) and \(\rho_0\) must then be computed by recursion
+    over sentential forms, as in \cref{fig:mdp-derivation}(b), rather than by
+    the closed forms \eqref{eq:continue-vroll} and \eqref{eq:exact-mass}.
+    \item \emph{The reward lives on \([-1,1]\).}  The clip in
+    \eqref{eq:mdp-reward} is a guard against fit failure, and it costs the
+    identity \eqref{eq:reward-is-variance}: a reward of \(-1\) is not a
+    variance share.  The exploration constant of \eqref{eq:mean-uct}, which
+    is the Hoeffding deviation for rewards on \([0,1]\), is then no longer
+    calibrated.  This is one reason the controlled family is worth building
+    separately rather than reusing this instance.
+    \item \emph{Constants are fitted nonlinearly.}  Under
+    \eqref{eq:atom-productions} the model is linear in its coefficients and
+    \eqref{eq:least-squares-fit} is a projection.  Here a general
+    Levenberg--Marquardt solve is run from a fixed initialization under an
+    evaluation cap, so the reward is a property of the \emph{oracle} as much
+    as of the structure: the same expression can score differently under a
+    different cap.  The \(10^{-12}\) cross-check demanded by Experiment~1 is
+    therefore a check against a linear-algebra evaluator, not against this
+    one.
+\end{enumerate}
+None of the three affects the definitions \eqref{eq:vstar} and
+\eqref{eq:vroll}, which need only a deterministic transition and a terminal
+reward.  What they affect is which closed forms apply, and that is exactly the
+gap the controlled family of \eqref{eq:target-family} is built to close.
+\end{rem}
+
+\subsection{Motivation and scope}
+
+
+\begin{question}
+What problems do we want to identify?
+\end{question}
+
+
+The central distinction is between the quality of a typical random completion
+and the quality of the best reachable completion.  \\ 
+
+
+Let \(s\) be a partial,
+derivation , let $\c{A}(s)$ be set of its legal actions, 
+let $T(s,a)$ be the deterministic transition function. 
+$$
+T: \c{S} \times \c{A} \ra \c{S} 
+$$
+
+A complete sequence of actions , produce a terminal expression $\pi$, with reward $R(\pi)$. \\  
+
+\begin{question}
+Can we design problems where it is easy to analytically evaluate $R(\pi)$. 
+
+\end{question}
+
+
+
+
+$$\mathcal E(s):= \crbr{ \pi : \pi \text{ can be completed from $s$}}$$  denote the set of terminal expressions
+reachable from \(s\).   \\ 
+
+\begin{question}
+What is the best expression hidden below the state? 
+\end{question}
+\noi The best-achievable value is
+\begin{equation}
+    V^*(s)
+    =
+    \max_{\pi\in\mathcal E(s)} R(\pi),
+    \label{eq:vstar}
+\end{equation}
+where \(R(\pi)\) is the terminal symbolic-regression reward.  \\ 
+
+\begin{question}
+In MCTS we use random roll out: what is the typical uniformly random completion under this state? 
+\end{question}
+
+\noi 
+Consider the fixed random-completion policy that, at each nonterminal state
+\(s\), selects uniformly among the legal actions \(\mathcal A(s)\),
+\[
+    q(a\mid s)=\frac{1}{|\mathcal A(s)|},
+    \qquad a\in\mathcal A(s).
+\]
+Because transitions are deterministic, following  a uniform policy from \(s\) to
+termination induces a distribution \(q(\pi\mid s)\) over the completions
+\(\pi\in\mathcal E(s)\), i.e. 
+\[
+q(-|s) \in \text{Dist}(\c{E}(s)).
+\]
+\\ 
+\noi The mean-rollout value is
+\begin{equation}
+    V^q(s)
+    =
+    \mathbb E_{\pi\sim q(\cdot\mid s)}
+    \bigl[R(\pi)\bigr].
+    \label{eq:vroll}
+\end{equation}
+
+
+\begin{rem}
+Why do we consider uniform distribution: 
+MCTS has 4 stage: 
+\begin{enumerate}
+    \item select (start at root) 
+    Choose action according to UCT formula 
+    $$
+a^* \in \arg \max _{a \in \c{A}(s)} \sqbr{Q(s,a) + c \sqrt{\frac{\log N(s)}{N(s,a)}}}
+    $$
+    \item Let $s$ be the state which reach at the "end" of the selection phase. 
+    We have an expansion policy : which is a uniform roll out from $s$ to obtain the value $V^q(s)$. 
+
+    \item Value backup: ... 
+\end{enumerate}
+\end{rem}
+
+\begin{rem} 
+The optimization objective depends on \(V^*\), whereas conventional UCT uses
+empirical mean returns as its exploitation statistic
+\cite{kocsis2006bandit}.  Asymptotic consistency does not by itself imply
+effective finite-budget search, and adverse finite-depth behavior is known for
+UCT \cite{coquelin2007bandit}.  This distinction is particularly relevant to
+symbolic regression, where the goal is to discover at least one exceptional
+expression rather than a policy with high average return.  Best-focused Monte
+Carlo methods have a history in single-player search and expression discovery
+\cite{cazenave2009nested,cazenave2013montecarlo}, while risk-seeking symbolic
+regression explicitly optimizes upper-tail rather than expected performance
+\cite{petersen2021deep}.  Recent MCTS-based symbolic-regression systems also
+emphasize learned proposal mechanisms or extreme-value allocation rather than
+pure mean-based UCT \cite{kamienny2023deep,huang2025improving}.
+\end{rem} 
+
+\begin{thoughts}
+
+We  believe there are two potential problems that can make pure MCTS bad:  \\ 
+
+\end{thoughts}
+% \begin{rem}
+% We can obtain 
+% $$
+% x_0 + \beta_1 x_1 + \beta_2 x_1 
+% $$
+
+% $$
+% x_0 + \beta_1 x_1 
+% $$
+% \end{rem}
+
+\begin{enumerate}
+    \item \emph{value-semantic failure}: \(V^q\) ranks competing branches in
+    the opposite order from \(V^*\); formally, for two sibling states $s_1$ and $s_2$, a value-semantic failure exists if:$$V^q(s_1) > V^q(s_2) \quad \text{while} \quad V^*(s_1) < V^*(s_2)$$In this scenario, MCTS confidently exploits the wrong branch because a shallow, suboptimal "decoy" yields a high expected reward, while the branch containing the true global optimum is penalized by a low expected reward due to the abundance of poor completions.
+    \item \emph{rare-event failure}: near-optimal completions have very small
+    probability under the rollout policy. 
+    For a tolerance $\varepsilon \geq 0$, this is the probability that a random rollout yields an expression within $\varepsilon$ of the true optimum:$$\rho_\varepsilon(s) = \Pr_{\pi \sim q(\cdot \mid s)} \big[ R(\pi) \geq V^*(s) - \varepsilon \big]$$ 
+
+
+\end{enumerate}
+
+\begin{example} The probability that the random rollout gets an optimal reward is: 
+
+$$\rho_0 (s) = \Pr_{ \pi \sim q(\cdot|s)} [R(\pi) = V^*(s)]$$
+
+\end{example}
+
+
+\noi Therefore: in any experiments, we should study 
+$$
+V^q(s), V^*(s), \rho_\varepsilon(s)
+$$
+\noi as our three primary metrics. \\ 
+
+
+\Cref{tab:failure-modes} summarizes the two mechanisms.
+
+\begin{table}[thbp!]
+    \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{1.35}
+    \begin{tabular}{@{}
+        >{\raggedright\arraybackslash}p{2.2cm}
+        >{\raggedright\arraybackslash}p{3.4cm}
+        >{\raggedright\arraybackslash}p{4.3cm}
+        >{\raggedright\arraybackslash}p{4.5cm}
+        @{}}
+        \toprule
+        \textbf{Failure mechanism} & \textbf{Formal condition} &
+        \textbf{Intuitive cause} & \textbf{Implication for search} \\
+        \midrule
+        Value-semantic failure &
+        \(V^q(s_1) > V^q(s_2)\) while \(V^*(s_1) < V^*(s_2)\)
+        for sibling states \(s_1, s_2\) &
+        A suboptimal branch has the higher mean rollout reward: a shallow
+        decoy looks better &
+        Search confidently exploits the wrong branch and starves the branch
+        containing the true global optimum. \\
+        \addlinespace
+        Rare-event failure &
+        \(\rho_\varepsilon(s) \ll B^{-1}\) &
+        Near-optimal completions carry a negligible fraction of the rollout
+        probability mass. &
+        Search explores the correct branch but exhausts the budget \(B\)
+        before sampling a near-optimal leaf. \\
+        \bottomrule
+    \end{tabular}
+    \caption{The two finite-budget failure mechanisms of mean-based MCTS.}
+    \label{tab:failure-modes}
+\end{table}
+
+Experiment~1 measures these two quantities exactly.  Experiment~2 tests
+whether they predict the finite-budget behavior of pure MCTS.
+
+\noi Our goal is then to answer: 
+
+
+\begin{question}
+After identifying the difficulty in pure MCTS, how does neural net address these? 
+\end{question}
+\subsection{Empirical function space}
+\label{subsec:empirical_function_space}
+\noi Suppose we are given to functions $f,g:\RR \ra \RR$. 
+We want to compute the empeircal mean and variance on the set of points. 
+\[
+    x_1,\ldots,x_n\in[-1,1],
+    \qquad n=41,
+\]
+
+be equally spaced sample points, 
+
+We want to comute emperical mean and or variance of \footnote{we think of these as the $y_i$s  from the target functions . }
+$$
+\crbr{f(x_i)}_{i=1}^n 
+$$ 
+
+
+We  define the empirical inner product
+
+\begin{defi}[Empirical inner product]
+Define the inner product $\anbr{-,-}_n :\RR^n \times \RR^n \ra \RR$ given by 
+\begin{equation}
+    \langle (x_i),(y_i))\rangle_n
+    =
+    \frac1n\sum_{i=1}^n x_i y_i,
+\label{eq:empirical-inner-product}
+\end{equation}
+\end{defi}
+
+\noi Two functions agreeing on the grid are identified, so
+\eqref{eq:empirical-inner-product} is an inner product on \(\R^n\) and every
+statement below is Euclidean geometry in \(\R^n\).  Let \(\mathbf 1\) denote
+the constant function \(1\) and write
+\begin{equation}
+    \|f\|_n^2=\langle f,f\rangle_n=\frac1n\sum_{i=1}^n f(x_i)^2,
+    \qquad
+    \overline f=\langle f,\mathbf 1\rangle_n=\frac1n\sum_{i=1}^n f(x_i),
+    \qquad
+    \operatorname{Var}_n(f)=\|f-\overline f\,\mathbf 1\|_n^2 .
+    \label{eq:norm-mean-variance}
+\end{equation}
+Three readings of these symbols are used repeatedly.
+\begin{enumerate}
+    \item \(\|f\|_n^2\) is the \emph{mean} square of \(f\) over the grid, not
+    the sum of squares; the factor \(1/n\) is what makes \(\mathbf 1\) a unit
+    vector, \(\|\mathbf 1\|_n=1\).  The two conventions differ by a constant,
+    \(\|f\|_2^2=n\|f\|_n^2\).
+    \item \(\overline f\) is at once the sample mean of \(f\) and the
+    coordinate of \(f\) along \(\mathbf 1\); hence
+    \(\overline f\,\mathbf 1\) is the orthogonal projection of \(f\) onto
+    \(\operatorname{span}\{\mathbf 1\}\), and \(f\) is centered exactly when
+    \(f\perp\mathbf 1\).
+    \item Splitting \(\R^n=\operatorname{span}\{\mathbf 1\}\oplus
+    \mathbf 1^{\perp}\) gives the Pythagorean identity
+    \begin{equation}
+        \|f\|_n^2=\overline f^{\,2}+\operatorname{Var}_n(f),
+        \label{eq:mean-variance-split}
+    \end{equation}
+    so squared norm and empirical variance coincide precisely on centered
+    functions.
+\end{enumerate}
+
+\noi Starting from the monomials \(x,x^2,\ldots,x^{12}\), remove their empirical
+means and apply Gram--Schmidt orthogonalization,
+\[
+    \psi_1,\ldots,\psi_{12}
+\]
+satisfying
+\begin{equation}
+    \langle \psi_j,1\rangle_n=0,
+    \qquad
+    \langle\psi_j,\psi_\ell\rangle_n=\delta_{j\ell}.
+    \label{eq:orthonormal-basis}
+\end{equation}
+The first two basis functions are the normalized linear and centered-quadratic
+components,
+\begin{equation}
+    \psi_1(x)=\frac{x}{\sqrt{\mu_2}},
+    \qquad
+    \psi_2(x)=\frac{x^2-\mu_2}{\sqrt{\nu}},
+    \label{eq:first-two-basis}
+\end{equation}
+where
+\[
+    \mu_2=\langle x,x\rangle_n,
+    \qquad
+    \nu=\langle x^2-\mu_2,x^2-\mu_2\rangle_n.
+\]
+Thus the construction extends the orthogonal linear--quadratic decomposition
+used in the motivating quadratic example.
+
+\subsection{Controlled target family}
+
+\begin{question}
+What family of target functions should we consider? 
+\begin{itemize}
+    \item What discrete set $\c{T}$ (of expressions, $\psi_1, \ldots, \psi_M$) should we consider?
+    Let suppose suppose our expressions 
+    $\c{T}$ has only 4 generators, $\psi_1, \psi_2, \psi_3, \psi_4$. 
+    $$
+\c{T} = \c{P}(\crbr{\psi_1, \psi_2, \psi_3, \psi_4})
+    $$
+    \item How should we choose the $\psi_1, \ldots, \psi_4$. 
+    We want to choose monomials $x, x^2, x^3,x^4$, however, for computational purposes, 
+    as we will require easy to compute variance, we will do some simplifications on the monomials with respect to the given dataset $\crbr{x_i}_{i=1}^n$ as an
+    input to our symbolic regression problem. The process is \Cref{subsec:empirical_function_space}. 
+\end{itemize}
+\end{question}
+
+For \(\lambda\in(0,1)\), define the four-component target
+\begin{equation}
+    y_\lambda(x)
+    =
+    \sqrt{\lambda}\,\psi_1(x)
+    +
+    \sqrt{\frac{1-\lambda}{3}}
+    \left(
+        \psi_2(x)+\psi_3(x)+\psi_4(x)
+    \right).
+    \label{eq:target-family}
+\end{equation}
+
+\begin{thoughts}
+You can assume these $\psi_i$s  are $x^i$. 
+\end{thoughts}
+\begin{prop}[Zero mean and unit target variance]
+\label{prop:target-normalization}
+For every \(\lambda\in(0,1)\),
+\begin{equation}
+    \overline y_\lambda=\langle y_\lambda,1\rangle_n=0,
+    \qquad
+    \|y_\lambda\|_n^2=\langle y_\lambda,y_\lambda\rangle_n=1.
+    \label{eq:target-normalization}
+\end{equation}
+\end{prop}
+
+% \noi In the notation \eqref{eq:norm-mean-variance}, the first identity says
+% that the target has sample mean zero, equivalently that it is orthogonal to
+% the constant function; the second says that its mean square over the grid is
+% one.  By \eqref{eq:mean-variance-split} the two together say that the
+% empirical variance of \(y_\lambda\) equals \(1\), so \(\|y_\lambda\|_n^2\) may
+% be read either as a squared length or as a variance without further comment.
+
+\begin{proof}
+Both identities use only the three properties of the basis
+\eqref{eq:orthonormal-basis}: each \(\psi_j\) is centered,
+\(\langle\psi_j,1\rangle_n=0\); has unit length,
+\(\langle\psi_j,\psi_j\rangle_n=1\); and is orthogonal to the others,
+\(\langle\psi_j,\psi_\ell\rangle_n=0\) for \(j\neq\ell\).
+For the mean, linearity gives
+\[
+    \langle y_\lambda,1\rangle_n
+    =
+    \sqrt{\lambda}\,\langle\psi_1,1\rangle_n
+    +
+    \sqrt{\tfrac{1-\lambda}{3}}
+    \sum_{m=2}^{4}\langle\psi_m,1\rangle_n
+    =0.
+\]
+Since the mean is zero, \(\|y_\lambda\|_n^2\) is the empirical variance of
+\(y_\lambda\).  Expanding \(\langle y_\lambda,y_\lambda\rangle_n\) produces
+sixteen terms; orthogonality annihilates every cross-term, and unit length
+reduces each surviving square to its coefficient:
+\[
+    \|y_\lambda\|_n^2
+    =
+    \lambda
+    +
+    3\cdot\frac{1-\lambda}{3}
+    =1.
+\]
+The identity is the Pythagorean theorem in the geometry
+\eqref{eq:empirical-inner-product}.
+\end{proof}
+
+\noi The parameter \(\lambda\) is therefore exactly the fraction of target
+variance carried by \(\psi_1\).  We use
+\begin{equation}
+    \lambda_{\mathrm{weak}}=\frac14,
+    \qquad
+    \lambda_{\mathrm{strong}}=0.997.
+    \label{eq:lambda-values}
+\end{equation}
+When \(\lambda=1/4\), all four target components have equal variance share.
+When \(\lambda=0.997\), the first component explains \(99.7\%\) of the target
+variance and each remaining component explains \(0.1\%\).  The latter is a
+controlled analogue of a pseudo-linear target: a shallow one-term expression
+is almost perfectly predictive but is not structurally exact.
+\Cref{fig:scenario-weak,fig:scenario-strong} display the two scenarios end to
+end, from the variance ledger to the root values.
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/scenario_weak.png}
+    \caption{%
+    The weak-decoy scenario, \(\lambda_{\mathrm{weak}}=1/4\).  One colour per
+    role throughout: red is everything the decoy action \(D\) reaches, blue is
+    everything reachable only through the continue action \(C\), grey the
+    distractor atoms \(\psi_5,\ldots,\psi_M\).
+    \textbf{(a)} The controlled derivation grammar, with the exact values
+    \eqref{eq:decoy-values}, \eqref{eq:continue-vstar},
+    \eqref{eq:continue-vroll} and \eqref{eq:exact-mass} printed on the leaves;
+    \(D\) terminates immediately into \(\mathcal M_D\), while \(C\) opens the
+    four atom slots \(A_1,\ldots,A_4\) of \eqref{eq:atom-productions}. 
+    \textbf{(b)} The same picture in function space: the decoy fit
+    \(\widehat y_D=\sqrt\lambda\,\psi_1\) leaves the residual
+    \(\sqrt{(1-\lambda)/3}\,(\psi_2+\psi_3+\psi_4)\), of squared length
+    \(1-\lambda=0.75\). 
+    \textbf{(c)} The variance ledger \eqref{eq:atom-weight-values}: the unit
+    target variance of Proposition~\ref{prop:target-normalization} splits into
+    four equal shares, of which \(D\) can capture only the first.
+    \textbf{(d)} Root values.  The mean-rollout evaluator ranks \(C\) above
+    \(D\) at both \(M\), so it agrees with the \(V^*\) ordering and no
+    value-semantic failure occurs; only rare-event failure remains, and it is
+    governed by \(\rho_0\).
+    Generated by \texttt{figures/make\_scenario\_figures.py}.
+    }
+    \label{fig:scenario-weak}
+\end{figure}
+
+\subsection{Why the target is normalized}
+\label{subsec:why-normalize}
+
+Proposition~\ref{prop:target-normalization} is a normalization.  Two elementary facts make this precise: the
+normalization costs no generality (Lemma~\ref{lem:affine-invariance}), and it
+converts the reward into an additive accounting of target variance
+(Lemma~\ref{lem:reward-is-variance}).  Throughout, \(\mathcal M\subseteq\R^n\)
+is a linear model class containing \(\mathbf 1\), \(\Pi_{\mathcal M}\) is the
+orthogonal projection onto \(\mathcal M\) in the geometry
+\eqref{eq:empirical-inner-product} --- equivalently, the least-squares fit
+\eqref{eq:least-squares-fit} --- and
+\begin{equation}
+    R(y;\mathcal M)
+    =
+    1-\frac{\|y-\Pi_{\mathcal M}y\|_2^2}
+           {\|y-\overline y\,\mathbf 1\|_2^2}
+    \label{eq:r2-abstract}
+\end{equation}
+is the unpenalized \(R^2\) reward of \eqref{eq:r2-reward}. 
+Th
+
+\begin{lem}[The reward is affine-invariant]
+\label{lem:affine-invariance}
+For all \(\alpha\neq0\) and \(\beta\in\R\),
+\begin{equation}
+    R(\alpha y+\beta\mathbf 1;\mathcal M)=R(y;\mathcal M).
+    \label{eq:affine-invariance}
+\end{equation}
+\end{lem}
+
+\begin{proof}
+Since \(\Pi_{\mathcal M}\) is linear and \(\mathbf 1\in\mathcal M\), we have
+$$ \Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
+=\alpha\,\Pi_{\mathcal M}y+\beta\mathbf 1$$ 
+\noi where we note that $\Pi_{\c{M}}(\mathbf 1) = \mathbf 1$. \\ 
+
+
+so the residual scales by
+\(\alpha\),
+\[
+    (\alpha y+\beta\mathbf 1)-\Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
+    =
+    \alpha\left(y-\Pi_{\mathcal M}y\right).
+\]
+The centered target scales by \(\alpha\) as well, because
+\(\overline{\alpha y+\beta}=\alpha\overline y+\beta\).  Numerator and
+denominator of \eqref{eq:r2-abstract} therefore both acquire the factor
+\(\alpha^2\), which cancels.
+\end{proof}
+
+\noi Consequently the reward landscape --- and with it \(V^*\), \(V^q\) and
+\(\rho_\varepsilon\) at every state of the search tree --- is constant on each
+affine family \(\{\alpha y+\beta\mathbf 1:\alpha\neq0,\ \beta\in\R\}\).  Every
+nonconstant family contains exactly two centered unit-norm representatives,
+\(\pm(y-\overline y\,\mathbf 1)/\sqrt{\operatorname{Var}_n(y)}\), and
+\eqref{eq:target-family} selects one of them.  Normalizing is thus a choice of
+coordinates on an equivalence class, and it buys the following identity.
+
+\begin{lem}[The reward is captured variance]
+\label{lem:reward-is-variance}
+Suppose \(\overline y=0\) and \(\|y\|_n=1\), and let
+\(\{\mathbf 1,\phi_1,\ldots,\phi_k\}\) be an orthonormal basis of
+\(\mathcal M\) in the geometry \eqref{eq:empirical-inner-product}.  Then
+\begin{equation}
+    R(y;\mathcal M)
+    =
+    1-\|y-\Pi_{\mathcal M}y\|_n^2
+    =
+    \|\Pi_{\mathcal M}y\|_n^2
+    =
+    \sum_{i=1}^{k}\langle y,\phi_i\rangle_n^{2}
+    \;\in[0,1].
+    \label{eq:reward-is-variance}
+\end{equation}
+\end{lem}
+
+\begin{proof}
+The two norms differ by a constant, \(\|\cdot\|_2^2=n\|\cdot\|_n^2\), so the
+factor \(n\) cancels in \eqref{eq:r2-abstract}; since \(\overline y=0\) the
+denominator is \(n\|y\|_n^2=n\), which gives the first equality.  The residual
+is orthogonal to \(\mathcal M\), hence to \(\Pi_{\mathcal M}y\), so
+Pythagoras gives
+\(1=\|y\|_n^2=\|\Pi_{\mathcal M}y\|_n^2+\|y-\Pi_{\mathcal M}y\|_n^2\), which
+is the second.  Expanding the projection in the orthonormal basis and using
+\(\langle y,\mathbf 1\rangle_n=\overline y=0\) leaves
+\(\Pi_{\mathcal M}y=\sum_{i}\langle y,\phi_i\rangle_n\phi_i\), and Parseval
+gives the third.  Finally
+\(0\leq\|\Pi_{\mathcal M}y\|_n^2\leq\|y\|_n^2=1\).
+\end{proof}
+
+\noi Write
+\begin{equation}
+    w_m=\langle y_\lambda,\psi_m\rangle_n^{2},
+    \qquad m=1,\ldots,M,
+    \label{eq:atom-weights}
+\end{equation}
+for the share of target variance carried by the \(m\)th atom.  In this
+notation Proposition~\ref{prop:target-normalization} states exactly that
+\begin{equation}
+    w=\left(
+        \lambda,\ \tfrac{1-\lambda}{3},\ \tfrac{1-\lambda}{3},
+        \ \tfrac{1-\lambda}{3},\ 0,\ldots,0
+      \right)
+    \qquad\text{is a probability vector on }\{1,\ldots,M\},
+    \label{eq:atom-weight-values}
+\end{equation}
+and Lemma~\ref{lem:reward-is-variance}, applied to the model class
+\eqref{eq:terminal-model-space}, reads
+\begin{equation}
+    R(\mathbf j)=w\bigl(J(\mathbf j)\bigr)=\sum_{m\in J(\mathbf j)}w_m .
+    \label{eq:reward-is-coverage}
+\end{equation}
+The reward of a terminal expression is the \(w\)-measure of the set of atoms
+it selects.  This is \eqref{eq:analytic-terminal-reward}, and it is what the
+normalization is for.  Four consequences are used throughout.
+
+\begin{enumerate}
+    \item \emph{The design parameter is the decoy reward.}  For the
+    unnormalized target \(\sqrt\lambda\,\psi_1+c(\psi_2+\psi_3+\psi_4)\) the
+    decoy captures the fraction \(\lambda/(\lambda+3c^2)\).  Only the
+    constraint \(\lambda+3c^2=1\) makes the coefficient we set equal to the
+    number we compare, so that \(R(D)=\lambda\)
+    (Proposition~\ref{prop:decoy-reward}) and the inversion condition reads
+    \(\lambda>p_M\) in \eqref{eq:inversion-condition} with no conversion
+    factor.  Had \(\|y_\lambda\|_n\) drifted with \(\lambda\), turning the
+    decoy knob would also have rescaled every reward, confounding the
+    value-semantic effect with a scale effect.
+
+    \item \emph{One absolute reward scale across the four cells.}  By
+    \eqref{eq:reward-is-variance}, \(R\in[0,1]\) with \(R=1\) if and only if
+    \(J(\mathbf j)\supseteq\{1,2,3,4\}\), so exact recovery is a reward value
+    rather than a tolerance, and simple regret \(r_B=1-R_B^{\max}\) is the
+    unexplained share of target variance.  In particular
+    \(1-\lambda_{\mathrm{strong}}=0.003\) is literally \(0.3\%\) of the target
+    variance.  Cells differing in \(\lambda\) and \(M\) are therefore compared
+    on the same axis, and the UCT bonus in \eqref{eq:mean-uct}, whose
+    constant is the Hoeffding deviation for rewards supported in \([0,1]\),
+    is admissible in all of them without recalibration.
+
+    \item \emph{Exact statistics become counting.}  Because
+    \eqref{eq:reward-is-coverage} is additive in the selected atoms, taking
+    expectations reduces \(V^q\) to four marginal inclusion probabilities;
+    this is precisely the proof of
+    Proposition~\ref{prop:continue-values}, and it requires neither sampling
+    nor fitting.  The same identity is what the \(10^{-12}\) agreement
+    between the analytic and least-squares evaluators tests, the denominator
+    of \eqref{eq:r2-reward} being the constant \(n\) rather than a fitted
+    quantity.
+
+    \item \emph{Centering is what makes ``variance share'' true.}  Since
+    \(\overline y_\lambda=0\) and every model class considered contains
+    \(\mathbf 1\), the intercept vanishes identically, least squares reduces
+    to coordinatewise projection onto the selected \(\psi_j\), and
+    \(\|y_\lambda\|_n^2=\operatorname{Var}_n(y_\lambda)\) by
+    \eqref{eq:mean-variance-split}.  Without centering, the \(R^2\)
+    denominator would no longer be \(\|y_\lambda\|_n^2\) and \(\lambda\) would
+    not be the fraction of variance explained by \(\psi_1\).
+\end{enumerate}
+
+\begin{rem}
+Lemma~\ref{lem:affine-invariance} also delimits the claim.  Normalization
+fixes bookkeeping, not difficulty: it changes no reward, no ordering and no
+completion probability.  The controlled family \eqref{eq:target-family} is
+therefore not a special case but a canonical representative, and the secondary
+validation on centered, variance-normalized quadratic targets tests the same
+reward landscape as the raw ones.
+\end{rem}
+
+\newpage 
+
+
+\section{Controlled derivation grammar}
+
+The root state \(s_0\) has two legal actions.
+
+\paragraph{Decoy action.} The first action, denoted \(D\), terminates
+immediately with the shallow model class
+\begin{equation}
+    \mathcal M_D
+    =
+    \operatorname{span}\{1,\psi_1\}.
+    \label{eq:decoy-model}
+\end{equation}
+The branch contains a single terminal expression, fitted by least squares
+and scored by the same unpenalized \(R^2\) criterion as every terminal
+expression, cf.\ \eqref{eq:r2-reward} below.  Every visit therefore
+returns one deterministic reward, and that reward is exactly the decoy
+parameter.
+
+\begin{prop}[Decoy reward]
+\label{prop:decoy-reward}
+For every \(\lambda\in(0,1)\), the least-squares fit of \(y_\lambda\) in
+\(\mathcal M_D\) is
+\begin{equation}
+    \widehat y_D=\sqrt{\lambda}\,\psi_1,
+    \label{eq:decoy-fit}
+\end{equation}
+and its reward is
+\begin{equation}
+    R(D)=\lambda.
+    \label{eq:decoy-reward}
+\end{equation}
+\end{prop}
+
+\begin{proof}
+Because the numerator and denominator of \eqref{eq:r2-reward} carry the
+same factor \(n\), the ratio is unchanged if both are computed in the
+geometry \eqref{eq:empirical-inner-product}; we do so throughout.  The
+constant function satisfies \(\langle 1,1\rangle_n=1\), so by
+\eqref{eq:orthonormal-basis} the set \(\{1,\psi_1\}\) is an orthonormal
+basis of \(\mathcal M_D\), and the least-squares fit is the orthogonal
+projection
+\[
+    \widehat y_D
+    =
+    \langle y_\lambda,1\rangle_n\,1
+    +
+    \langle y_\lambda,\psi_1\rangle_n\,\psi_1 .
+\]
+The intercept vanishes, \(\langle y_\lambda,1\rangle_n=0\), by
+Proposition~\ref{prop:target-normalization}.  For the slope, expand
+\(y_\lambda\) by \eqref{eq:target-family}; orthogonality annihilates the
+three cross-terms and unit length leaves
+\[
+    \langle y_\lambda,\psi_1\rangle_n
+    =
+    \sqrt{\lambda}\,\langle\psi_1,\psi_1\rangle_n
+    =
+    \sqrt{\lambda},
+\]
+which proves \eqref{eq:decoy-fit}.  The residual is then explicit,
+\[
+    y_\lambda-\widehat y_D
+    =
+    \sqrt{\tfrac{1-\lambda}{3}}
+    \left(\psi_2+\psi_3+\psi_4\right),
+\]
+and the Pythagorean theorem in the geometry
+\eqref{eq:empirical-inner-product} gives
+\(\|y_\lambda-\widehat y_D\|_n^2=3\cdot\tfrac{1-\lambda}{3}=1-\lambda\).
+Since \(\overline y_\lambda=0\) and \(\|y_\lambda\|_n^2=1\)
+(Proposition~\ref{prop:target-normalization}), the reward
+\eqref{eq:r2-reward} evaluates to
+\[
+    R(D)
+    =
+    1-\frac{\|y_\lambda-\widehat y_D\|_n^2}{\|y_\lambda\|_n^2}
+    =
+    1-(1-\lambda)
+    =
+    \lambda.
+    \qedhere
+\]
+\end{proof}
+
+\begin{rem}[The decoy is an exact trap]
+\label{rem:decoy-trap}
+Proposition~\ref{prop:decoy-reward} is classical: on orthonormal
+regressors, least squares projects coordinatewise and \(R^2\) is the
+captured share of target variance \cite[\S3.2.3]{hastie2009elements}.  Its
+role here is structural.  At \(\lambda_{\mathrm{strong}}=0.997\), a
+structurally incomplete one-term model earns a deterministic reward of
+\(0.997\) in exact arithmetic, while the sibling branch containing the
+exact expression returns the far smaller mean \eqref{eq:continue-vroll}
+under random completion.  Objectives whose locally averaged signal points
+away from the global optimum are called \emph{deceptive} in evolutionary
+computation \cite{goldberg1987simple}; the analogous hazard for
+sampling-based tree search is the shallow \emph{search trap}
+\cite{ramanujan2010adversarial}, on which UCT's transitory regret can grow
+doubly exponentially in the depth \cite{coquelin2007bandit}.  The decoy
+transplants this structure into single-player symbolic regression, where a
+near-perfect \(R^2\) on a wrong functional form is precisely the failure
+mode that motivates reporting predictive-accuracy and symbolic solutions
+separately in benchmark evaluation \cite{lacava2021contemporary}.
+\end{rem}
+
+\paragraph{Continue action.} The second action, denoted \(C\), opens the
+compositional branch.  It contains the structurally exact four-component
+expression, whose reward is \(1\); a uniform random completion, however,
+recovers that expression only rarely, and the mean completion reward is
+\(p_M\), cf.\ \eqref{eq:continue-vroll}.
+
+The action creates four atom slots \(A_1,\ldots,A_4\).  Each slot has
+the productions
+\begin{equation}
+    A_r
+    \longrightarrow
+    \psi_1\mid\psi_2\mid\cdots\mid\psi_M,
+    \qquad r=1,\ldots,4,
+    \label{eq:atom-productions}
+\end{equation}
+where
+\begin{equation}
+    M\in\{4,12\}.
+    \label{eq:M-values}
+\end{equation}
+A terminal continuation is an ordered tuple
+\[
+    \mathbf j=(j_1,j_2,j_3,j_4)
+    \in\{1,\ldots,M\}^4.
+\]
+Let
+\[
+    J(\mathbf j)=\{j_1,j_2,j_3,j_4\}
+\]
+be the set of distinct selected atoms.  The corresponding fitted model space
+is
+\begin{equation}
+    \mathcal M_{\mathbf j}
+    =
+    \operatorname{span}
+    \bigl(
+        \{1\}\cup\{\psi_j:j\in J(\mathbf j)\}
+    \bigr).
+    \label{eq:terminal-model-space}
+\end{equation}
+Repeated atoms are removed before fitting, or equivalently handled by the
+Moore--Penrose pseudoinverse.
+
+For a design matrix \(X_{\mathbf j}\), the fitted coefficients are
+\begin{equation}
+    \widehat a_{\mathbf j}
+    =
+    (X_{\mathbf j}^{\mathsf T}X_{\mathbf j})^\dagger
+    X_{\mathbf j}^{\mathsf T}y_\lambda.
+    \label{eq:least-squares-fit}
+\end{equation}
+The terminal reward is unpenalized \(R^2\),
+\begin{equation}
+    R(\mathbf j)
+    =
+    1-
+    \frac{
+        \|y_\lambda-X_{\mathbf j}\widehat a_{\mathbf j}\|_2^2
+    }{
+        \|y_\lambda-\overline y_\lambda\mathbf 1\|_2^2
+    }.
+    \label{eq:r2-reward}
+\end{equation}
+No reward clipping or nonlinear optimizer is used.
+
+Repeating the projection argument in the proof of
+Proposition~\ref{prop:decoy-reward}, now for the orthonormal basis of
+\(\mathcal M_{\mathbf j}\), shows that the reward has the exact form
+\begin{equation}
+    R(\mathbf j)
+    =
+    \lambda\,\mathbf 1\{1\in J(\mathbf j)\}
+    +
+    \frac{1-\lambda}{3}
+    \sum_{m=2}^4
+    \mathbf 1\{m\in J(\mathbf j)\}.
+    \label{eq:analytic-terminal-reward}
+\end{equation}
+Consequently, all rewards lie in \([0,1]\), distractor atoms
+\(\psi_5,\ldots,\psi_M\) capture no target variance, and the exact reward is
+independent of numerical fitting pathologies.
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/scenario_strong.png}
+    \caption{%
+    The strong-decoy scenario, \(\lambda_{\mathrm{strong}}=0.997\).  Colours
+    and panels are as in \cref{fig:scenario-weak}; only \(\lambda\) has
+    changed, and by Lemma~\ref{lem:affine-invariance} nothing else about the
+    environment has been rescaled.
+    \textbf{(b)} The decoy fit is now visually indistinguishable from the
+    target and the residual is flat at the plotting scale, yet it is not zero:
+    \(\|y_\lambda-\widehat y_D\|_n^2=1-\lambda=0.003\).  This is the
+    pseudo-linear regime, where near-perfect prediction coexists with
+    structural error.
+    \textbf{(c)} The decoy now captures \(99.7\%\) of the unit variance, and
+    the three shares reachable only through \(C\) are \(0.1\%\) each.
+    \textbf{(d)} The mean-rollout evaluator reverses the correct ordering at
+    both \(M\), since \(R(D)=0.997>p_M\) while \(V^*(D)=0.997<V^*(C)=1\);
+    this is the value-semantic failure of \cref{tab:failure-modes} and the
+    exact trap of Remark~\ref{rem:decoy-trap}.
+    }
+    \label{fig:scenario-strong}
+\end{figure}
+
+
+\subsection{Exact completion statistics}
+
+Let \(D\) and \(C\) denote the root children corresponding to the decoy and
+continue actions.  Since the decoy child admits the single completion of
+Proposition~\ref{prop:decoy-reward}, it satisfies
+\begin{equation}
+    V^*(D)=V^q(D)=\lambda.
+    \label{eq:decoy-values}
+\end{equation}
+
+\begin{prop}[Continue-branch values]
+\label{prop:continue-values}
+The continue branch selects four atoms uniformly and independently from the
+vocabulary \(\{\psi_1,\ldots,\psi_M\}\).  Its best-achievable reward is
+\begin{equation}
+    V^*(C)=1,
+    \label{eq:continue-vstar}
+\end{equation}
+and its mean-rollout reward is
+\begin{equation}
+    V^q(C)
+    =
+    p_M
+    =
+    1-\left(1-\tfrac{1}{M}\right)^{4}.
+    \label{eq:continue-vroll}
+\end{equation}
+\end{prop}
+
+\begin{proof}
+The reward \eqref{eq:analytic-terminal-reward} is maximal when
+\(J(\mathbf j)\supseteq\{1,2,3,4\}\), where every indicator equals one and
+\[
+    R(\mathbf j)
+    =
+    \lambda+\frac{1-\lambda}{3}\cdot 3
+    =
+    1;
+\]
+the tuple \(\mathbf j=(1,2,3,4)\) achieves this, proving
+\eqref{eq:continue-vstar}.  For the mean, take expectations in
+\eqref{eq:analytic-terminal-reward} under the uniform completion policy
+\(q\):
+\[
+    V^q(C)
+    =
+    \lambda\,\Pr_q\!\left(1\in J(\mathbf j)\right)
+    +
+    \frac{1-\lambda}{3}
+    \sum_{m=2}^4
+    \Pr_q\!\left(m\in J(\mathbf j)\right).
+\]
+A fixed atom \(m\) is missed by one slot with probability \(1-\frac1M\),
+hence by all four independent slots with probability
+\((1-\frac1M)^4\), so \(\Pr_q(m\in J(\mathbf j))=p_M\) for every \(m\).
+Substituting gives
+\(V^q(C)=\lambda p_M+(1-\lambda)p_M=p_M\).
+\end{proof}
+
+Comparing \eqref{eq:decoy-values} with \eqref{eq:continue-vroll}, the
+mean-rollout evaluator reverses the correct root ordering exactly when
+\begin{equation}
+    \lambda>p_M.
+    \label{eq:inversion-condition}
+\end{equation}
+
+Exact recovery requires the four selected atoms to form a permutation of
+\((1,2,3,4)\).  Among the \(M^4\) equally likely ordered tuples, exactly
+\(4!\) are permutations of the target, hence
+\begin{equation}
+    \rho_0(C)
+    =
+    \Pr_q(R=1\mid C)
+    =
+    \frac{4!}{M^4}.
+    \label{eq:exact-mass}
+\end{equation}
+
+
+\begin{question}
+What is the minimum number of rollouts ($K$) we must perform to guarantee, with $95\%$ confidence, that we will see the exact solution at least once?
+\end{question}
+
+\begin{prop}[Hit probability and sample complexity]
+\label{prop:hit-sample-complexity}
+Draw \(K\) independent uniform completions of \(C\).  The probability that
+at least one is exact is
+\begin{equation}
+    P_{\mathrm{hit}}(K)
+    =
+    1-\left(1-\rho_0(C)\right)^K,
+    \label{eq:hit-probability}
+\end{equation}
+and, for \(\delta\in(0,1)\), the guarantee
+\(P_{\mathrm{hit}}(K)\ge 1-\delta\) holds if and only if
+\begin{equation}
+    K
+    \;\ge\;
+    K_{1-\delta}
+    =
+    \left\lceil
+    \frac{\log\delta}
+         {\log(1-\rho_0(C))}
+    \right\rceil.
+    \label{eq:hit-sample-complexity}
+\end{equation}
+\end{prop}
+
+\begin{proof}
+A single completion misses the exact expression with probability
+\(1-\rho_0(C)\).  By independence, all \(K\) completions miss with
+probability \((1-\rho_0(C))^K\), and the complement of that event is
+\eqref{eq:hit-probability}.  The guarantee
+\(P_{\mathrm{hit}}(K)\ge 1-\delta\) is therefore equivalent to
+\[
+    \left(1-\rho_0(C)\right)^K\le\delta.
+\]
+Taking logarithms gives \(K\log(1-\rho_0(C))\le\log\delta\), and dividing
+by \(\log(1-\rho_0(C))\), which is negative, reverses the inequality:
+\[
+    K
+    \ge
+    \frac{\log\delta}{\log(1-\rho_0(C))}.
+\]
+The smallest integer satisfying this bound is the ceiling in
+\eqref{eq:hit-sample-complexity}.
+\end{proof}
+
+Table~\ref{tab:controlled-cells} gives the four environments.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+Cell
+& \(\lambda\)
+& \(M\)
+& \(V^q(C)\)
+& \(\rho_0(C)\)
+& Inversion
+& \(K_{0.95}\)\\
+\midrule
+Weak decoy, low distraction
+& \(0.25\)
+& \(4\)
+& \(0.683594\)
+& \(0.09375\)
+& No
+& \(31\)\\
+Strong decoy, low distraction
+& \(0.997\)
+& \(4\)
+& \(0.683594\)
+& \(0.09375\)
+& Yes
+& \(31\)\\
+Weak decoy, high distraction
+& \(0.25\)
+& \(12\)
+& \(0.293933\)
+& \(0.001157\)
+& No
+& \(2587\)\\
+Strong decoy, high distraction
+& \(0.997\)
+& \(12\)
+& \(0.293933\)
+& \(0.001157\)
+& Yes
+& \(2587\)\\
+\bottomrule
+\end{tabular}
+\caption{
+Controlled \(2\times2\) design.  The decoy parameter \(\lambda\) controls
+whether the random-completion mean has the correct root ordering, while
+\(M\) controls the mass of exact completions.  The column \(K_{0.95}\)
+is conditional on repeatedly sampling the continue branch.
+}
+\label{tab:controlled-cells}
+\end{table}
+
+\section{Experiment 1: exact value-semantic audit}
+
+
+\begin{question} 
+    \noi What is the relation between these two values and running MCTS in practice? 
+
+    \begin{enumerate}
+        \item Does mean random-completion return preserve the ordering induced by
+best-achievable reward 
+i.e  $V^q $ and $V^*$ rank the states correctly ? 
+\item 
+ and how rare is the exact expression within each
+partial derivation? 
+$$\rho_\varepsilon$$ 
+
+    \end{enumerate}
+\end{question}
+
+\noi The steps of the full experiment: 
+\begin{enumerate}
+    \item Define family $y_\lambda$. 
+    \item Plot the values of primary outputs.
+\end{enumerate}
+
+\paragraph{Hypothesis 1.}
+The rollout mean ranks the continue branch above the decoy for
+\(\lambda=0.25\) and below the decoy for \(\lambda=0.997\):
+\begin{equation}
+    V^q(C)>\lambda_{\mathrm{weak}},
+    \qquad
+    V^q(C)<\lambda_{\mathrm{strong}}.
+    \label{eq:hypothesis-one-order}
+\end{equation}
+Independently, the completion budget required for exact recovery scales as
+\begin{equation}
+    K_{1-\delta}
+    =
+    \Theta\left(
+        \frac{\log(1/\delta)}{\rho_0}
+    \right)
+    \quad\text{as }\rho_0\rightarrow0.
+    \label{eq:hypothesis-one-rarity}
+\end{equation}
+
+\paragraph{Procedure.}
+No stochastic tree search is used in this experiment.  For each of the four
+cells, enumerate all \(M^4\) terminal continuations and all partial prefixes
+of depths \(0,1,2,3,4\).  For each partial state \(s\), compute exactly
+\begin{equation}
+    V^*(s),\qquad
+    V^q(s),\qquad
+    \rho_0(s).
+    \label{eq:experiment-one-quantities}
+\end{equation}
+For a nonterminal state \(s\), define the action selected by the mean-rollout
+oracle as
+\begin{equation}
+    a_q(s)
+    =
+    \arg\max_a V^q(T(s,a)),
+    \label{eq:mean-oracle-action}
+\end{equation}
+and define its oracle sibling regret by
+\begin{equation}
+    g_q(s)
+    =
+    V^*(s)-V^*(T(s,a_q(s))).
+    \label{eq:sibling-regret}
+\end{equation}
+The largest environment contains only
+\[
+    1+12+12^2+12^3+12^4=22{,}621
+\]
+continue-prefix states, so exhaustive calculation is tractable.
+
+The implementation must compute each terminal reward in two ways:
+\begin{enumerate}
+    \item using the analytical expression
+    \eqref{eq:analytic-terminal-reward};
+    \item using the actual least-squares evaluator
+    \eqref{eq:least-squares-fit}--\eqref{eq:r2-reward}.
+\end{enumerate}
+The two values must agree to numerical tolerance \(10^{-12}\).
+
+\paragraph{Primary outputs.}
+Report the exact root quantities
+\[
+    V^*(D),\quad V^q(D),\quad
+    V^*(C),\quad V^q(C),\quad
+    \rho_0(C),\quad K_{0.95}.
+\]
+Plot:
+\begin{enumerate}
+    \item the terminal completion-reward distribution in each cell;
+    \item \(V^q(s)\) against \(V^*(s)\), stratified by state depth;
+    \item sibling regret \(g_q(s)\) against depth;
+    \item the exact hit curve \(1-(1-\rho_0)^K\).
+\end{enumerate}
+
+Because Experiment~1 is an exact census, it requires no random seeds,
+confidence intervals, or significance tests.  Failure to reproduce the
+analytical identities indicates an implementation error and should prevent
+proceeding to Experiment~2.
+
+\section{Experiment 2: finite-budget pure-MCTS limits}
+
+\paragraph{Question.}
+At matched terminal-evaluation budgets, do the value-order mismatch and
+exact-completion rarity identified in Experiment~1 predict the behavior of
+actual pure search?
+
+\subsubsection{Search conditions}
+
+We compare three conditions.
+
+\paragraph{Uniform random search.}
+Sample complete derivations independently from the uniform grammar policy and
+return the best terminal expression observed.
+
+\paragraph{Mean-UCT.}
+At node \(s\), select
+\begin{equation}
+    a_t
+    =
+    \arg\max_a
+    \left[
+        \overline Q_t(s,a)
+        +
+        \sqrt{
+            \frac{2\log N_t(s)}
+                 {N_t(s,a)}
+        }
+    \right],
+    \label{eq:mean-uct}
+\end{equation}
+where \(\overline Q_t(s,a)\) is the empirical mean of terminal returns from
+simulations passing through \((s,a)\).  Unvisited actions receive infinite
+score.  Each simulation selects through the current tree, expands one
+unvisited edge, performs one uniform random completion, and backs up the
+terminal reward by an arithmetic mean.
+
+\paragraph{Max-UCT diagnostic.}
+Define
+\begin{equation}
+    Q_t^{\max}(s,a)
+    =
+    \max
+    \left\{
+        R(\pi_b):
+        \pi_b\text{ was sampled through }(s,a)
+    \right\}.
+    \label{eq:qmax}
+\end{equation}
+Select using
+\begin{equation}
+    a_t
+    =
+    \arg\max_a
+    \left[
+        Q_t^{\max}(s,a)
+        +
+        \sqrt{
+            \frac{2\log N_t(s)}
+                 {N_t(s,a)}
+        }
+    \right].
+    \label{eq:max-uct}
+\end{equation}
+The tree structure, expansion policy, rollout policy, and exploration term
+are otherwise identical to Mean-UCT.  This condition is a causal diagnostic
+of the mean-versus-maximum distinction, not a claim that naive maximum backup
+is universally optimal.  A calibrated extreme-bandit allocation rule is a
+natural subsequent comparison \cite{huang2025improving}.
+
+\subsubsection{Evaluation protocol}
+
+Each search run uses one persistent tree rooted at \(s_0\).  The algorithm
+does not commit to a grammar action before the budget is exhausted.  No
+network, learned prior, Dirichlet noise, reward clipping, complexity penalty,
+or nonlinear optimizer is used.  One simulation contains exactly one
+terminal reward evaluation.
+
+Use the terminal-evaluation budgets
+\begin{equation}
+    \mathcal B
+    =
+    \{
+        16,32,64,128,256,512,
+        1024,2048,4096,8192
+    \}.
+    \label{eq:budget-grid}
+\end{equation}
+For each of the four benchmark cells and each search condition, use \(100\)
+independent seeds.  Run each seed once to \(B_{\max}=8192\) and record all
+intermediate checkpoints.  The same base-seed list is used across algorithms.
+
+\subsubsection{Outcomes}
+
+Let \(\pi_1,\ldots,\pi_B\) be the terminal expressions observed by budget
+\(B\).  Define the best-observed reward
+\begin{equation}
+    R_B^{\max}
+    =
+    \max_{1\leq b\leq B}R(\pi_b),
+    \label{eq:best-observed-reward}
+\end{equation}
+the simple regret
+\begin{equation}
+    r_B
+    =
+    1-R_B^{\max},
+    \label{eq:simple-regret}
+\end{equation}
+and the exact-recovery indicator
+\begin{equation}
+    S_B
+    =
+    \mathbf 1
+    \left\{
+        R_B^{\max}\geq1-10^{-12}
+    \right\}.
+    \label{eq:exact-recovery-indicator}
+\end{equation}
+The time to exact recovery is
+\begin{equation}
+    T_{\mathrm{exact}}
+    =
+    \inf\{B:S_B=1\}.
+    \label{eq:time-to-recovery}
+\end{equation}
+
+Exact recovery is the primary outcome.  Simple regret is secondary because
+the incorrect decoy in the strong-decoy cells already has simple regret
+\[
+    1-\lambda_{\mathrm{strong}}=0.003.
+\]
+Thus predictive reward alone cannot distinguish near-perfect approximation
+from structural recovery.  This distinction is consistent with symbolic
+regression benchmarks that report both predictive and exact-recovery
+performance \cite{lacava2021contemporary}.
+
+For mechanism diagnosis, record the continue-visit fraction
+\begin{equation}
+    F_B
+    =
+    \frac{N_B(s_0,C)}{N_B(s_0)},
+    \label{eq:continue-fraction}
+\end{equation}
+together with the final root recommendation, number of distinct terminal
+sequences, number of distinct canonical atom sets, and the best reward found
+through each root action.  The final visit-count recommendation is diagnostic
+only; the primary search output is the best terminal expression encountered.
+
+\subsubsection{Hypotheses}
+
+\paragraph{Hypothesis 2a: value-semantic effect.}
+Mean-UCT will allocate less search to the continue branch under
+\(\lambda=0.997\) than under \(\lambda=0.25\), because its exploitation
+statistic converges toward \(V^q(C)\), which lies below the strong-decoy
+reward.  Max-UCT will be less sensitive to this inversion after observing
+high-reward continuations.
+
+\paragraph{Hypothesis 2b: rarity effect.}
+For every algorithm and fixed \(\lambda\), exact recovery will be slower for
+\(M=12\) than for \(M=4\).  At moderate budgets, recovery will be organized
+approximately by the effective rare-event budget
+\begin{equation}
+    B\rho_0.
+    \label{eq:effective-rare-budget}
+\end{equation}
+
+\paragraph{Hypothesis 2c: interaction.}
+The largest recovery difference between Max-UCT and Mean-UCT will occur in
+the strong-decoy, high-distraction cell
+\[
+    (\lambda,M)=(0.997,12),
+\]
+where the continue branch has both a lower rollout mean than the decoy and a
+small exact-completion mass.
+
+One pre-specified interaction contrast is
+\begin{align}
+    \Delta_{\mathrm{semantic}}(B,M)
+    &=
+    \left[
+        P_B^{\mathrm{Max}}-P_B^{\mathrm{Mean}}
+    \right]_{\lambda=0.997}
+    \nonumber\\
+    &\quad -
+    \left[
+        P_B^{\mathrm{Max}}-P_B^{\mathrm{Mean}}
+    \right]_{\lambda=0.25},
+    \label{eq:semantic-interaction}
+\end{align}
+where
+\[
+    P_B^A
+    =
+    \Pr_A(S_B=1)
+\]
+is the exact-recovery probability for algorithm \(A\).  The prediction is
+\[
+    \Delta_{\mathrm{semantic}}(B,M)>0,
+\]
+with a larger effect expected at \(M=12\).
+
+\subsubsection{Statistical reporting and interpretation}
+
+For each budget, cell, and algorithm, report the exact-recovery proportion
+with a \(95\%\) Wilson interval, median simple regret with a seed-bootstrap
+interval, the empirical survival curve
+\[
+    \Pr(T_{\mathrm{exact}}>B),
+\]
+and the continue-visit fraction \(F_B\).
+
+The interpretation is mechanism-based:
+\begin{itemize}
+    \item If Mean-UCT fails while Max-UCT succeeds, the mean-return statistic
+    is causally implicated.
+    \item If both methods deteriorate primarily when \(M=12\), completion
+    rarity is the dominant limitation.
+    \item If random search outperforms Mean-UCT in a strong-decoy cell, the
+    tree allocation rule actively suppresses the optimal branch.
+    \item If Mean-UCT succeeds despite the exact value-order inversion, UCT
+    exploration is sufficient at the tested budgets and the mismatch alone is
+    not a complete explanation.
+    \item If Max-UCT performs worse in weak-decoy cells, maximum backup is
+    overoptimistic and should not be treated as a universal replacement for
+    mean backup.
+    \item If simple regret is small while exact recovery remains poor, the
+    experiment demonstrates a separation between predictive approximation
+    and symbolic identification.
+\end{itemize}
+
+\subsection{Secondary validation and deferred questions}
+
+After the two primary experiments, a nonconfirmatory validation may repeat
+the key comparison on centered and variance-normalized versions of the
+motivating quadratic targets, using an additive grammar and direct linear
+least squares.  The original full grammar, nonlinear constant fitting,
+uniform-prior PUCT, learned policy and value heads, and SRBench evaluation
+should be introduced only after the controlled mechanisms are understood.
+
+In particular, a subsequent neural experiment should ask whether a learned
+policy or value function corrects the pure-search failures identified here,
+or instead learns and amplifies the biased targets produced by mean-return
+search.  Separating that learning question from the present pure-search study
+is necessary for a causal interpretation.
+
+% =====================================================================
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
