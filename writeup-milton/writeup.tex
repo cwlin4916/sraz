@@ -225,11 +225,277 @@ optimization.
 
 
 
+\subsection{The derivation MDP}
+\label{subsec:derivation-mdp}
+
+\begin{question}
+What exactly is the Markov decision process that the search runs on?
+\end{question}
+
+\noi Everything below \eqref{eq:vstar} presumes a state space of partial
+derivations, a legal-action set, a deterministic transition and a reward that
+arrives only at termination.  We now fix those objects, because the
+implementation we audit realizes them concretely and the realization is not
+quite the idealization.
+
+\paragraph{States.}
+A state is a \emph{sentential form}: a finite string over the grammar's
+alphabet, some of whose symbols are nonterminals.  Write
+\begin{equation}
+    \c{S}
+    =
+    \crbr{
+        s \in \Sigma^{\le L-1}
+    },
+    \qquad
+    s_0 = S,
+    \label{eq:mdp-states}
+\end{equation}
+where \(\Sigma\) is the symbol alphabet, \(S\) the start symbol and \(L\) a
+token budget.  The implementation stores \(s\) as a fixed-length buffer of
+\(L\) integers padded on the right, together with the count of occupied slots;
+the pad symbol is what makes the observation space a fixed-shape array rather
+than a variable-length string.  A state is terminal exactly when it contains
+no nonterminal.
+
+\paragraph{Actions.}
+An action names \emph{which} nonterminal to rewrite and \emph{how}:
+\begin{equation}
+    \c{A}(s)
+    =
+    \crbr{
+        (i,p)
+        \;:\;
+        s_i \in \c{N},\;
+        p \in \mathrm{Prod}(s_i),\;
+        |s| + |\mathrm{rhs}(p)| - 1 < L
+    },
+    \label{eq:mdp-actions}
+\end{equation}
+with \(\c{N}\) the nonterminals and \(\mathrm{Prod}(A)\) the productions of
+\(A\).  Pairs are flattened to a single index \(a = iP + p\), where \(P\) is
+the total number of productions, so the action space is
+\(\{0,\dots,LP-1\}\) with \eqref{eq:mdp-actions} supplied as a Boolean mask.
+Two features of \eqref{eq:mdp-actions} are easy to miss.  First, the length
+test is strict, so a finished expression has at most \(L-1\) tokens: the
+budget \(L\) is one token larger than the longest reachable expression.
+Second, the position \(i\) is chosen by the agent.  The derivation order is
+therefore \emph{not} fixed, and \(|\c{A}(s)|\) grows with the number of open
+nonterminals rather than being a constant \(|\mathrm{Prod}|\); the six states
+of \cref{fig:mdp-derivation}(a) have
+\(|\c{A}| = 4, 8, 12, 8, 4, 0\).
+
+\paragraph{Transition.}
+Rewriting is splicing, and it is deterministic:
+\begin{equation}
+    T\bigl(s,(i,p)\bigr)
+    =
+    s_{0:i}
+    \cdot
+    \mathrm{rhs}(p)
+    \cdot
+    s_{i+1:|s|}.
+    \label{eq:mdp-transition}
+\end{equation}
+Every step either lengthens the buffer or closes one nonterminal without
+lengthening it, so an episode terminates in at most \(2L\) steps.
+
+\paragraph{Reward.}
+Intermediate rewards vanish.  A terminal string \(\pi\) is read as a
+prefix-notation expression whose \(\texttt{C}_k\) tokens are free constants;
+those constants are fitted to the data by least squares and the reward is the
+resulting coefficient of determination,
+\begin{equation}
+    R(\pi)
+    =
+    \operatorname{clip}_{[-1,1]}
+    \Bigl(
+        1 - \tfrac{\mathrm{SS}_{\mathrm{res}}(\pi)}{\mathrm{SS}_{\mathrm{tot}}}
+    \Bigr),
+    \qquad
+    R(s) = 0 \text{ for } s \text{ nonterminal}.
+    \label{eq:mdp-reward}
+\end{equation}
+The clip is not cosmetic: it is what stops an unparseable or singular
+expression from returning \(-\infty\) and poisoning every value that backs up
+through it.  It also means the reward range is \([-1,1]\), not the \([0,1]\)
+that \eqref{eq:reward-is-variance} arranges for the controlled family.
+
+\paragraph{Completion policy and budget.}
+The rollout policy is uniform on \eqref{eq:mdp-actions},
+\(q(a \mid s) = 1/|\c{A}(s)|\), and since \eqref{eq:mdp-transition} is
+deterministic it induces \(q(\cdot \mid s) \in \Dist(\c{E}(s))\) exactly as in
+\eqref{eq:vroll}.  Note that this is uniform on \emph{pairs}: a form with two
+open nonterminals splits its mass across positions, so \(q\) is not the
+per-slot uniform law of \eqref{eq:atom-productions}.  One simulation performs
+one terminal evaluation, so the budget \(B\) of \eqref{eq:budget-grid} is the
+simulation count of a single persistent root search --- measured, \(B\)
+simulations at one completion per expanded leaf cost exactly \(B+1\) terminal
+evaluations, the extra one being the root expansion.
+
+\Cref{tab:mdp-components} collects the seven components and their
+realization.
+
+\begin{table}[thbp!]
+    \centering
+    \footnotesize
+    \renewcommand{\arraystretch}{1.30}
+    \begin{tabular}{@{}
+        >{\raggedright\arraybackslash}p{1.75cm}
+        >{\raggedright\arraybackslash}p{4.55cm}
+        >{\raggedright\arraybackslash}p{7.95cm}
+        @{}}
+        \toprule
+        \textbf{Component} & \textbf{Formal object} &
+        \textbf{Realization} \\
+        \midrule
+        State &
+        sentential form \(s \in \c{S}\), \eqref{eq:mdp-states};
+        \(s_0 = S\) &
+        length-\(L\) integer buffer, right-padded, plus an occupied-slot
+        count.  Terminal iff no nonterminal remains \\
+        \addlinespace
+        Action &
+        \((i,p)\): position and production, \eqref{eq:mdp-actions};
+        flattened to \(a = iP+p\) &
+        \(\{0,\dots,LP-1\}\) with a Boolean legality mask.  The agent chooses
+        \emph{which} nonterminal to expand, so the derivation order is free \\
+        \addlinespace
+        Transition &
+        \(T(s,(i,p))\), splice, \eqref{eq:mdp-transition};
+        deterministic &
+        in-place buffer splice; the strict length test in
+        \eqref{eq:mdp-actions} caps finished expressions at \(L-1\) tokens \\
+        \addlinespace
+        Reward &
+        \(0\) on nonterminals; \(R(\pi)\) at a leaf,
+        \eqref{eq:mdp-reward} &
+        prefix \(\to\) infix \(\to\) symbolic parse \(\to\) least-squares fit
+        of the free constants \(\to\) \(R^2\), clipped to \([-1,1]\); any
+        failure scores \(-1\).  Memoized per expression string \\
+        \addlinespace
+        Termination &
+        \(\c{A}(s) = \emptyset\) &
+        no nonterminal in the occupied prefix; at most \(2L\) steps \\
+        \addlinespace
+        Completion policy &
+        \(q(a\mid s) = 1/|\c{A}(s)|\) &
+        uniform over the flattened mask, i.e.\ over \emph{pairs}
+        \((i,p)\) and not over the productions of one designated slot \\
+        \addlinespace
+        Budget &
+        \(B\) terminal evaluations, \eqref{eq:budget-grid} &
+        \(B\) simulations of one persistent root search, one completion per
+        expanded leaf: exactly \(B+1\) evaluations \\
+        \bottomrule
+    \end{tabular}
+    \caption{%
+    The seven components of the derivation MDP and how each is realized.  The
+    three entries that do not simply instantiate the formalism --- a free
+    derivation order, a reward on \([-1,1]\) rather than \([0,1]\), and a
+    completion law uniform over position--production pairs --- are the ones
+    \cref{rem:formalism-vs-implementation} takes up.
+    }
+    \label{tab:mdp-components}
+\end{table}
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mdp_derivation.png}
+    \caption{%
+    The derivation MDP on the additive-quadratic instance, target
+    \(y = c_0 + c_1 x + c_2 x^2\) on \(41\) points of \([1,3]\), token budget
+    \(L=12\).  Colours follow \cref{fig:scenario-weak}: red is the shallow
+    branch with the highest reachable reward, blue the compositional branch
+    that contains the optimum, grey the remaining shallow branches.
+    \textbf{(a)} One episode: the token buffer of \eqref{eq:mdp-states}
+    rewritten by the splice \eqref{eq:mdp-transition}, with the flat action
+    index, its decoding into \((\text{position},\text{production})\), and
+    \(|\c{A}(s_k)|\) at each step.  Note that \(|\c{A}|\) rises to \(12\) and
+    falls back: it counts open nonterminals, not productions.
+    \textbf{(b)} The exact census.  Enumerating all \(4{,}898\) mask-reachable
+    sentential forms gives \(V^*\), \(V^q\) and \(\rho_0\) of
+    \eqref{eq:experiment-one-quantities} at every state without sampling.
+    The three shallow branches each hold one terminal, so \(V^q = V^*\) there;
+    the compositional branch holds \(405{,}778\).
+    \textbf{(c)} The reward \eqref{eq:mdp-reward} in data space: the best
+    one-term expression reaches \(R^2 = 0.9831\) on a structurally wrong form,
+    which is the exact trap of \cref{rem:decoy-trap} arising unprompted.
+    \textbf{(d)} The hit curve \eqref{eq:hit-probability} at the measured
+    \(\rho_0\).
+    Generated by \texttt{figures/make\_mdp\_figures.py}.
+    }
+    \label{fig:mdp-derivation}
+\end{figure}
+
+\begin{figure}[tbp]
+    \centering
+    \includegraphics[width=\textwidth]{figures/mcts_expansion.png}
+    \caption{%
+    The same environment searched by pure MCTS --- uniform prior, one random
+    completion per expanded leaf, mean backup --- from a single persistent
+    root, at budgets \(B \in \{8,32,128\}\).
+    \textbf{(a)--(c)} The tree actually built.  Edge width is the visit count
+    \(N(s,a)\); the labels are read off the search, not assigned.
+    \textbf{(d)} The visit share of each root action.  It moves the wrong way:
+    the branch containing the optimum takes \(0.875\) of the budget at
+    \(B=8\) and only \(0.25\) at \(B=128\), while the shallow decoy climbs to
+    \(0.68\).
+    \textbf{(e)} Why.  The exploitation statistic \(\overline Q_B\) converges
+    to \(V^q\), not \(V^*\), and here
+    \(V^q(D) = 0.983 > V^q(C) = 0.885\) while
+    \(V^*(D) = 0.983 < V^*(C) = 1\): the value-semantic failure of
+    \cref{tab:failure-modes}, measured rather than constructed.
+    \textbf{(f)} The consequence.  The best expression observed is
+    \(0.998597\) at every budget --- the search never recovers the exact
+    three-term form, so simple regret is small while exact recovery fails,
+    the separation \eqref{eq:simple-regret} is designed to expose.
+    Generated by \texttt{figures/make\_mdp\_figures.py}.
+    }
+    \label{fig:mcts-expansion}
+\end{figure}
+
+\begin{rem}[Where the formalism and the implementation diverge]
+\label{rem:formalism-vs-implementation}
+Three of the seven rows of \cref{tab:mdp-components} are not instantiations of
+the formalism but departures from it, and each one has a consequence for the
+experiments.
+\begin{enumerate}
+    \item \emph{The derivation order is free.}  The controlled grammar of
+    \eqref{eq:atom-productions} fills four labelled slots, so a completion is
+    a tuple \(\mathbf j\) and the uniform law factorizes.  Here the agent
+    also chooses \(i\), so \(|\c{A}(s)|\) is state-dependent and \(q\) does
+    not factorize.  \(V^q\) and \(\rho_0\) must then be computed by recursion
+    over sentential forms, as in \cref{fig:mdp-derivation}(b), rather than by
+    the closed forms \eqref{eq:continue-vroll} and \eqref{eq:exact-mass}.
+    \item \emph{The reward lives on \([-1,1]\).}  The clip in
+    \eqref{eq:mdp-reward} is a guard against fit failure, and it costs the
+    identity \eqref{eq:reward-is-variance}: a reward of \(-1\) is not a
+    variance share.  The exploration constant of \eqref{eq:mean-uct}, which
+    is the Hoeffding deviation for rewards on \([0,1]\), is then no longer
+    calibrated.  This is one reason the controlled family is worth building
+    separately rather than reusing this instance.
+    \item \emph{Constants are fitted nonlinearly.}  Under
+    \eqref{eq:atom-productions} the model is linear in its coefficients and
+    \eqref{eq:least-squares-fit} is a projection.  Here a general
+    Levenberg--Marquardt solve is run from a fixed initialization under an
+    evaluation cap, so the reward is a property of the \emph{oracle} as much
+    as of the structure: the same expression can score differently under a
+    different cap.  The \(10^{-12}\) cross-check demanded by Experiment~1 is
+    therefore a check against a linear-algebra evaluator, not against this
+    one.
+\end{enumerate}
+None of the three affects the definitions \eqref{eq:vstar} and
+\eqref{eq:vroll}, which need only a deterministic transition and a terminal
+reward.  What they affect is which closed forms apply, and that is exactly the
+gap the controlled family of \eqref{eq:target-family} is built to close.
+\end{rem}
+
 \subsection{Motivation and scope}
 
 
 \begin{question}
-What problems do we want to identify? 
+What problems do we want to identify?
 \end{question}
 
 
@@ -539,7 +805,7 @@ For \(\lambda\in(0,1)\), define the four-component target
 \begin{thoughts}
 You can assume these $\psi_i$s  are $x^i$. 
 \end{thoughts}
-\begin{prop}[Unit target variance]
+\begin{prop}[Zero mean and unit target variance]
 \label{prop:target-normalization}
 For every \(\lambda\in(0,1)\),
 \begin{equation}
@@ -550,12 +816,12 @@ For every \(\lambda\in(0,1)\),
 \end{equation}
 \end{prop}
 
-\noi In the notation \eqref{eq:norm-mean-variance}, the first identity says
-that the target has sample mean zero, equivalently that it is orthogonal to
-the constant function; the second says that its mean square over the grid is
-one.  By \eqref{eq:mean-variance-split} the two together say that the
-empirical variance of \(y_\lambda\) equals \(1\), so \(\|y_\lambda\|_n^2\) may
-be read either as a squared length or as a variance without further comment.
+% \noi In the notation \eqref{eq:norm-mean-variance}, the first identity says
+% that the target has sample mean zero, equivalently that it is orthogonal to
+% the constant function; the second says that its mean square over the grid is
+% one.  By \eqref{eq:mean-variance-split} the two together say that the
+% empirical variance of \(y_\lambda\) equals \(1\), so \(\|y_\lambda\|_n^2\) may
+% be read either as a squared length or as a variance without further comment.
 
 \begin{proof}
 Both identities use only the three properties of the basis
@@ -617,11 +883,11 @@ end, from the variance ledger to the root values.
     \eqref{eq:decoy-values}, \eqref{eq:continue-vstar},
     \eqref{eq:continue-vroll} and \eqref{eq:exact-mass} printed on the leaves;
     \(D\) terminates immediately into \(\mathcal M_D\), while \(C\) opens the
-    four atom slots \(A_1,\ldots,A_4\) of \eqref{eq:atom-productions}.
+    four atom slots \(A_1,\ldots,A_4\) of \eqref{eq:atom-productions}. 
     \textbf{(b)} The same picture in function space: the decoy fit
     \(\widehat y_D=\sqrt\lambda\,\psi_1\) leaves the residual
     \(\sqrt{(1-\lambda)/3}\,(\psi_2+\psi_3+\psi_4)\), of squared length
-    \(1-\lambda=0.75\).
+    \(1-\lambda=0.75\). 
     \textbf{(c)} The variance ledger \eqref{eq:atom-weight-values}: the unit
     target variance of Proposition~\ref{prop:target-normalization} splits into
     four equal shares, of which \(D\) can capture only the first.
@@ -637,8 +903,7 @@ end, from the variance ledger to the root values.
 \subsection{Why the target is normalized}
 \label{subsec:why-normalize}
 
-Proposition~\ref{prop:target-normalization} is a normalization, not a
-modelling assumption.  Two elementary facts make this precise: the
+Proposition~\ref{prop:target-normalization} is a normalization.  Two elementary facts make this precise: the
 normalization costs no generality (Lemma~\ref{lem:affine-invariance}), and it
 converts the reward into an additive accounting of target variance
 (Lemma~\ref{lem:reward-is-variance}).  Throughout, \(\mathcal M\subseteq\R^n\)
@@ -653,7 +918,8 @@ orthogonal projection onto \(\mathcal M\) in the geometry
            {\|y-\overline y\,\mathbf 1\|_2^2}
     \label{eq:r2-abstract}
 \end{equation}
-is the unpenalized \(R^2\) reward of \eqref{eq:r2-reward}.
+is the unpenalized \(R^2\) reward of \eqref{eq:r2-reward}. 
+Th
 
 \begin{lem}[The reward is affine-invariant]
 \label{lem:affine-invariance}
@@ -666,8 +932,12 @@ For all \(\alpha\neq0\) and \(\beta\in\R\),
 
 \begin{proof}
 Since \(\Pi_{\mathcal M}\) is linear and \(\mathbf 1\in\mathcal M\), we have
-\(\Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
-=\alpha\,\Pi_{\mathcal M}y+\beta\mathbf 1\), so the residual scales by
+$$ \Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
+=\alpha\,\Pi_{\mathcal M}y+\beta\mathbf 1$$ 
+\noi where we note that $\Pi_{\c{M}}(\mathbf 1) = \mathbf 1$. \\ 
+
+
+so the residual scales by
 \(\alpha\),
 \[
     (\alpha y+\beta\mathbf 1)-\Pi_{\mathcal M}(\alpha y+\beta\mathbf 1)
@@ -798,7 +1068,10 @@ validation on centered, variance-normalized quadratic targets tests the same
 reward landscape as the raw ones.
 \end{rem}
 
-\subsection{Controlled derivation grammar}
+\newpage 
+
+
+\section{Controlled derivation grammar}
 
 The root state \(s_0\) has two legal actions.
 
