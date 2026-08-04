@@ -617,7 +617,10 @@ We  believe there are two potential problems that can make pure MCTS bad:  \\
     \item \emph{rare-event failure}: near-optimal completions have very small
     probability under the rollout policy. 
     For a tolerance $\varepsilon \geq 0$, this is the probability that a random rollout yields an expression within $\varepsilon$ of the true optimum:$$\rho_\varepsilon(s) = \Pr_{\pi \sim q(\cdot \mid s)} \big[ R(\pi) \geq V^*(s) - \varepsilon \big]$$ 
+\noi where $q(\cdot \mid s)$ is the uniform rollout. 
 
+If this probability is low:  then this means that the near optimal completions are rare events. 
+This is what lead to the max operator in the UCT formula. 
 
 \end{enumerate}
 
@@ -637,6 +640,10 @@ $$
 
 \Cref{tab:failure-modes} summarizes the two mechanisms.
 
+\milton{We can emperically look at public symbolic regression problems and 
+verify whether these two failures modes are there. }
+
+\milton{Question for AI: are these metrics sufficient? Is it practical? can we give explicit metrics for practical problems?}
 \begin{table}[thbp!]
     \centering
     \footnotesize
@@ -670,6 +677,15 @@ $$
     \caption{The two finite-budget failure mechanisms of mean-based MCTS.}
     \label{tab:failure-modes}
 \end{table}
+
+\milton{The strategy of the project : 
+\begin{enumerate}
+    \item Design a family of problems $(y_\lambda)$ (the $\lambda$ is what dictates the difficulty of symbolic regression problem) 
+    Such that failure modes occur. 
+    \item See if MCTS succeed or not when these failure modes are present. 
+    \item Understand if neural net acutally help. 
+\end{enumerate}
+}
 
 Experiment~1 measures these two quantities exactly.  Experiment~2 tests
 whether they predict the finite-budget behavior of pure MCTS.
@@ -801,6 +817,15 @@ For \(\lambda\in(0,1)\), define the four-component target
     \right).
     \label{eq:target-family}
 \end{equation}
+
+\noi where these $\psi_i$s are the orthonormal basis functions constructed above.  
+The strategy now: 
+\begin{enumerate}
+    \item explicitly compute $V^q(s) $ and $V^*(s)$  $\rho_\varepsilon(s)$, for each state $s$ when 
+    we run the symbolic game with the target $y_\lambda$. \\ 
+
+
+\end{enumerate} 
 
 \begin{thoughts}
 You can assume these $\psi_i$s  are $x^i$. 
