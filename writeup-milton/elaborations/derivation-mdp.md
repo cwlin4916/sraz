@@ -113,7 +113,9 @@ The bound is attained: at $L=12$ the longest terminals have $11$ tokens, and
 $177$ of the $247$ terminals do. The strict `<` is load-bearing — it is why the
 buffer never fills, and why `max_len` must be set one larger than the longest
 expression one wants reachable. At $L=11$ the exact expression
-`+ C0 + * C1 x * C2 * x x` is excluded and $V^*(s_0)$ drops to $0.998597$.
+`+ C0 + * C1 x * C2 * x x` is excluded and $V^*(s_0)$ becomes
+target-dependent: it stays at $1$ for every linear target, which needs only
+five tokens, and drops to $0.997213$ on `quad_B` and $0.527856$ on `quad_A`.
 
 ### Proposition 2 (no dead ends) — `prop:no-dead-ends`
 
@@ -165,7 +167,7 @@ it needs no second environment to obtain it.
 Exactly four actions are legal at $s_0$, one per production, with four distinct
 successors. Following eq. `eq:root-decoys` of the write-up we name those four
 successor **states** after the production that creates them — they are states,
-not actions, which is what lets $V^*$, $V^q$ and $\rho_0$ be written against
+not actions, which is what lets $V^*$, $V^q$ and $\rho$ be written against
 them. Since the four root actions are in bijection with the four children, the
 same names index the root edges, as in the visit count $N(s_0,C)$.
 
@@ -186,6 +188,6 @@ solves. Across the eight named targets of
 twice (`lin_A`, `quad_D`).
 
 `../figures/make_family_figures.py` computes all of it by the same exhaustive
-census — $V^*$, $V^q$ and $\rho_0$ by one backward induction over the DAG, the
+census — $V^*$, $V^q$ and $\rho$ by one backward induction over the DAG, the
 fitter called once per terminal and cached, so a target costs $247$ fits rather
 than $4{,}898$.
