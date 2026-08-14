@@ -12,13 +12,14 @@ Two families are defined, both on the symmetric domain x in [-1, 1]:
 
 The quadratic members partition the space by the two geometric invariants that
 matter relative to the domain: the vertex ``x_v = -c1 / (2 c2)`` (inside or
-outside the domain) and the discriminant ``D = c1^2 - 4 c0 c2`` (real roots or
+outside the domain) and the discriminant ``disc = c1^2 - 4 c0 c2`` (real roots or
 none). The linear members mirror the same logic with the only invariants a
 line has: its root ``-c0 / c1`` and its coefficient scaling.
 
-Both families are scored by the same 7-production grammar as the default
-target, sinusoid production included. The sinusoid is a *distractor* here: no
-member needs it, so a search that reaches for it is overfitting structure.
+The controlled study scores both families under ``ADDITIVE_GRAMMAR`` (four
+productions, buffer L=12), where every member is exactly expressible. The
+7-production grammar, whose sine and division productions are pure distractors
+for these targets, is reserved for the secondary validation.
 """
 
 from __future__ import annotations
@@ -99,7 +100,11 @@ class Target:
 
     @property
     def discriminant(self) -> float | None:
-        """D = c1^2 - 4 c0 c2; None for a linear target."""
+        """disc = c1^2 - 4 c0 c2; None for a linear target.
+
+        Spelled ``disc`` in the write-up and figures: ``D`` there names a decoy
+        state D_1, D_2, D_3 at the MDP root.
+        """
         if self.family != "quadratic":
             return None
         c0, c1, c2 = self.coeffs
@@ -162,7 +167,7 @@ LINEAR_TARGETS = {
 QUADRATIC_TARGETS = {
     "quad_A": Target(
         name="quad_A", family="quadratic", coeffs=(1.0, -1.0, 2.0),
-        label="Interior extremum: vertex x_v=0.25 inside the domain, D=-7<0 (arch)",
+        label="Interior extremum: vertex x_v=0.25 inside the domain, disc=-7<0 (arch)",
     ),
     # c0 = 6 (not 1) keeps both roots outside [-1, 1]: with c0 = 1 the smaller
     # root falls at x = 0.204, which would make this a root-crossing target and
@@ -184,7 +189,7 @@ QUADRATIC_TARGETS = {
     # and stop it testing the three-term derivation at all.
     "quad_D": Target(
         name="quad_D", family="quadratic", coeffs=(-0.48, 0.4, 2.0),
-        label="Root crossing: D=4>0, roots at x=-0.6 and 0.4 both inside the domain",
+        label="Root crossing: disc=4>0, roots at x=-0.6 and 0.4 both inside the domain",
     ),
 }
 
