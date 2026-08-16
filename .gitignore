@@ -18,3 +18,8 @@ repo_summary/
 *.log
 *.out
 *.synctex.gz
+# Experiment console logs are results, not build artifacts -- keep them despite *.log
+!Claude-experiments/**/*.log
+# Memoised lmfit R^2 lookups: ~10 MB per problem seed, rebuilt on demand by
+# Claude-scripts/01-state-value-gap.py. Derived data, so kept out of history.
+Claude-experiments/**/cache/

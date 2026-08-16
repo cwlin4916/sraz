@@ -1,0 +1,69 @@
+[memo] preloaded 204289 fits from fit_cache_sine_seed42.json
+=== c_exploration sweep: sine (problem_seed=42) ===
+target: 4*sin(4*x) + C0 + C1*x + C2*x**2   constants: {'C0': 3.322, 'C1': 2.317, 'C2': 3.576}
+pure MCTS: uniform prior P=1/K, random rollouts (rollout_n=20, rollout_budget=500, mean backup)
+greedy = argmax visit counts, 24 paired episodes per cell
+reference: linear=0.8729  affine=0.9575  V*=0.9966
+
+--- 25 simulations per move ----------------------------------------
+  c= 0.25: mean=+0.9575 best=+0.9575 distinct= 4 [affx24]  (7.8s)
+           modal 16/24: (C0+(C0+(C0+(C0+(C0+(C1*x))))))
+           BEST  +0.9575: (C0+(C0+(C0+(C0+(C0+(C1*x))))))
+  c=  0.5: mean=+0.9575 best=+0.9575 distinct= 7 [affx24]  (5.7s)
+           modal  9/24: (C0+(C0+(C0+(C0+(C0+(C1*x))))))
+           BEST  +0.9575: (C0+(C0+(C0+(C0+(C0+(C1*x))))))
+  c=    1: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.7s)
+           modal 24/24: (C1*x)
+  c=    2: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.7s)
+           modal 24/24: (C1*x)
+  c=    3: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.7s)
+           modal 24/24: (C1*x)
+  c=    5: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.7s)
+           modal 24/24: (C1*x)
+  c=    8: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.7s)
+           modal 24/24: (C1*x)
+  c=   15: mean=+0.9515 best=+0.9575 distinct=14 [affx21, quadx3]  (5.2s)
+           modal  4/24: (((C0+C0)+C0)+(C1*x))
+           BEST  +0.9575: ((((C0+(C0+(C1*x)))+C0)+C0)+C0)
+--- 100 simulations per move ----------------------------------------
+  c= 0.25: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=  0.5: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=    1: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=    2: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=    3: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=    5: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=    8: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+  c=   15: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (0.8s)
+           modal 24/24: (C1*x)
+--- 400 simulations per move ----------------------------------------
+  c= 0.25: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.1s)
+           modal 24/24: (C1*x)
+  c=  0.5: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.1s)
+           modal 24/24: (C1*x)
+  c=    1: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.1s)
+           modal 24/24: (C1*x)
+  c=    2: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.1s)
+           modal 24/24: (C1*x)
+  c=    3: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.2s)
+           modal 24/24: (C1*x)
+  c=    5: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.2s)
+           modal 24/24: (C1*x)
+  c=    8: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.3s)
+           modal 24/24: (C1*x)
+  c=   15: mean=+0.8729 best=+0.8729 distinct= 1 [linx24]  (1.4s)
+           modal 24/24: (C1*x)
+
+--- summary --------------------------------------------------------
+  overall best R^2 = +0.9575 at c=0.25, sims=25
+    (C0+(C0+(C0+(C0+(C0+(C1*x))))))
+  cells beating the linear answer: 3/24
+  cells ever reaching a sin term:  0/24
+[saved] Claude-experiments/8-6/c-sweep_sine_seed42.json
+[saved] Claude-experiments/8-6/c-sweep_sine_seed42.png
