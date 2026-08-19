@@ -396,7 +396,7 @@ def fig_difficulty(fam: Family, out="family_difficulty.png"):
                 xytext=(-4, -34), textcoords="offset points",
                 arrowprops=dict(arrowstyle="-", color=C_DECOY, lw=0.8))
     ax.set_xticks([1, 3, 5, 7, 9, 11])
-    ax.set_xlabel("tokens in the terminal expression", fontsize=9.5)
+    ax.set_xlabel("symbols in the terminal expression", fontsize=9.5)
     ax.set_ylabel("best reachable $R^2$", fontsize=9.5)
     ax.set_ylim(-0.06, 1.06)
     ax.tick_params(labelsize=8.5)

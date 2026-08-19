@@ -128,9 +128,6 @@ and the symbolic search is \(\pi^*=\arg\max_{\pi\in\Pi}R(\pi)\).  The
 motivating instance is a quadratic target \(h(x)=c_0+c_1x+c_2x^2\), with
 structures ranging over the subsets of \(\{1,x,x^2\}\).
 
-We deliberately strip the problem to isolate the search mechanism: no
-variable-length trees, no invalid expressions, no noise, no complexity
-penalty, no additional operators, and no neural policy or value network.
 The structure search becomes \emph{subset selection}.  The purpose of the
 study is to characterize the finite-budget limitations of pure Monte Carlo
 tree search (MCTS) in grammar-based symbolic regression.  The
@@ -283,13 +280,13 @@ values are fitted, and \(C\) for a distinguished \emph{state}.
     Symbol & Type & Meaning \\
     \midrule
     \(s\in\c{S}\)               & state    & sentential form in the length-\(L\) buffer \\
-    \(s_0\)                     & state    & root, the one-token form \((S)\) \\
+    \(s_0\)                     & state    & root, the one-symbol form \((S)\) \\
     \(\pi\in\Pi\)               & state    & terminal expression; \(\Pi=\c{E}(s_0)\) \\
     \(\c{E}(s)\)                & set of states & terminals completable from \(s\) \\
     \(a=\mathrm{pos}\cdot P+\mathrm{prod}\) & action & flattened \((\mathrm{pos},\mathrm{prod})\) index \\
     \(\c{A}(s)\)                & set of actions & the legal mask at \(s\), \eqref{eq:action-mask} \\
     \(T(s,a)\)                  & map \(\c{S}\times\c{A}\ra\c{S}\) & deterministic transition \\
-    \(w_0,\ldots,w_{P-1}\)      & token strings & the productions, in code order \\
+    \(w_0,\ldots,w_{P-1}\)      & symbol strings & the productions, in code order \\
     \(S\), \(A\)                & nonterminals of \(G\) & italic; calligraphic \(\c{S},\c{A}\) are the state and action sets \\
     \(R(\pi)\)                  & \(\R\)   & \(\operatorname{clip}(R^2,-1,1)\) after the inner fit, \eqref{eq:code-reward} \\
     \(V^*,V^q,\rho\) & \(\c{S}\ra\R\) & \eqref{eq:vstar}, \eqref{eq:vroll}, \eqref{eq:rare-mass} \\
@@ -319,11 +316,19 @@ Fix a context-free grammar \(G\) with start symbol \(S\), production set
 (\texttt{max\_len}).  The environment is the deterministic undiscounted MDP:
 \begin{itemize}
     \item \emph{State.}  A sentential form \(s\in\Sigma^*\) with
-    \(\lvert s\rvert\le L\), stored as a fixed-length array of \(L\) tokens
+    \(\lvert s\rvert\le L\), stored as a fixed-length array of \(L\) symbols
     together with \(\lvert s\rvert=\)\,\texttt{real\_state\_len}; cells beyond
-    \(\lvert s\rvert\) hold a pad token.  The observation space is
+    \(\lvert s\rvert\) hold a pad symbol.  The observation space is
     \(\texttt{MultiDiscrete}([\,\lvert\Sigma\rvert+1\,]^{L})\), so the pad
-    symbol is observable and the agent sees how much buffer remains.
+    symbol is observable and the agent sees how much buffer
+    remains.\footnote{Load-bearing, not cosmetic: the policy/value net is a
+    fixed-width MLP over a one-hot encoding of the whole buffer, \(L(\lvert
+    \Sigma\rvert+1)\) inputs built by \texttt{SymRegPolicyValueNet.\_encode}.
+    \texttt{real\_state\_len} is never itself passed to the network, only
+    \texttt{state} is, so a pad symbol in the vocabulary is the only way a
+    fixed-shape input still carries \(|s|\): the network recovers it by
+    counting non-pad slots.}
+    \inlinefig{figures/state_buffer.png}
     \item \emph{Start.}  \(s_0=(S)\), a single nonterminal, \(\lvert s_0\rvert=1\).
     \item \emph{Action.}  An action must say \emph{which} cell of the buffer
     to rewrite and \emph{which} production to write there, so the action set is
@@ -357,7 +362,7 @@ Fix a context-free grammar \(G\) with start symbol \(S\), production set
     \(\mathrm{pos}\), shifts the tail right, and re-pads.  It is a function, not
     a kernel.
     \item \emph{Reward.}  \(R\equiv0\) at every nonterminal state.  At a
-    terminal, the token string is read as a prefix expression, its
+    terminal, the symbol string is read as a prefix expression, its
     \texttt{C*} tokens are fitted by \texttt{lmfit}, and the reward is the
     clipped coefficient of determination
     \begin{equation}
@@ -414,7 +419,7 @@ never called at all: \texttt{MCTS.\_rollout\_value} breaks out of its loop and
 \begin{prop}[Length bound]
 \label{prop:length-bound}
 Every reachable form satisfies \(\lvert s\rvert\le L-1\).  In particular every
-terminal expression has at most \(L-1\) tokens.
+terminal expression has at most \(L-1\) symbols.
 \end{prop}
 
 \begin{proof}
@@ -425,11 +430,11 @@ that \(\lvert s'\rvert<L\), hence \(\lvert s'\rvert\le L-1\).
 \end{proof}
 
 The bound is attained, and the strict inequality in \eqref{eq:action-mask} is
-load-bearing: at \(L=12\) the longest terminals have \(11\) tokens, and the
+load-bearing: at \(L=12\) the longest terminals have \(11\) symbols, and the
 exact expression \texttt{+ C0 + * C1 x * C2 * x x} is admissible so that
 \(V^*(s_0)=1\).  At \(L=11\) it is excluded, and \(V^*(s_0)\) then depends on
 the target: it stays at \(1\) for every linear target, which needs only five
-tokens, but falls to \(0.997213\) on \texttt{quad\_B} and \(0.527856\) on
+symbols, but falls to \(0.997213\) on \texttt{quad\_B} and \(0.527856\) on
 \texttt{quad\_A} (\cref{sec:family}).  A buffer must be set one longer than the
 longest expression one intends to be reachable.
 
@@ -455,10 +460,12 @@ reachable form, reintroduces dead ends --- and since the rollout discards them
 instead of scoring them, they would bias \(V^q\) silently rather than raise an
 error.
 
+\inlinefig{figures/deadend_causes.png}
+
 \begin{rem}[Parity]
 Each action changes the length by \(\lvert w\rvert-1\in\{0,2,4\}\), all even,
 and \(\lvert s_0\rvert=1\).  Every reachable form therefore has odd length, and
-terminals can only hold \(1,3,5,7,9,11\) tokens.  The census agrees exactly:
+terminals can only hold \(1,3,5,7,9,11\) symbols.  The census agrees exactly:
 \(1,2,5,14,48,177\) terminals at those six lengths.
 \end{rem}
 
@@ -481,7 +488,7 @@ A \emph{target} is a polynomial together with the grid it is sampled on,
     \quad n=41,
     \label{eq:target}
 \end{equation}
-with \(d\le2\) and coefficients \emph{chosen}, not drawn.  The family has eight
+with \(d\le2\) and coefficients \emph{chosen}.  The family has eight
 members: four linear, separated by where the zero \(-c_0/c_1\) falls relative
 to the domain, and four quadratic, separated by the vertex \(x_v=-c_1/2c_2\)
 and the discriminant \(\operatorname{disc}=c_1^2-4c_0c_2\).\footnote{\(x_v\)
@@ -494,20 +501,11 @@ The word \emph{root} is reserved throughout for the MDP root \(s_0\).}
 
 \inlinefig{figures/family_targets.png}
 
-Each member is a distinct shape over the domain --- monotone or turning,
-crossing zero or not --- and two of them spread their coefficients over six
-orders of magnitude (\texttt{lin\_C}, \texttt{quad\_C}) as a probe of the
-inner least-squares solve.  The solve survives it to eleven digits; what does
-not survive is the exactness test, so those two are reported and then set
-aside (\cref{rem:conditioning}).  Every member is exactly
-expressible in the grammar, so \(V^*(s_0)=1\) throughout and any shortfall is
-the search's, not the grammar's.
 
 \subsection{Where the difficulty is}
 \label{subsec:difficulty}
 
 
-\paragraph{The decoys are already in the grammar.}
 Exactly \(\lvert\c{A}(s_0)\rvert=4\) actions are legal at the root, one per
 production, and they have four distinct successors.  We name those four
 successor \emph{states} after the production that creates them,
@@ -521,15 +519,17 @@ successor \emph{states} after the production that creates them,
     C=\texttt{+ S S},
     \label{eq:root-decoys}
 \end{equation}
-so that \(D_i,C\in\c{S}\) and every value written against them --- \(V^*(C)\),
+the same four states already previewed in \cref{subsec:notation}, so that
+\(D_i,C\in\c{S}\) and every value written against them --- \(V^*(C)\),
 \(V^q(C)\), \(\rho(C)\), \(R(D_i)\) --- is the state function of
 \S\ref{subsec:values-failure-modes} evaluated at that state.  Because the four
 root actions are in bijection with these four children, we also write
 \(N(s_0,C)\) for the visit count of the edge \(s_0\ra C\); no separate symbol
 for a root action is needed.
 
+\paragraph{Three of the four are already decided.}
 Three of the four productions carry no nonterminal on the right, so \(D_1\),
-\(D_2\) and \(D_3\) are already terminal: each is a one-token derivation with
+\(D_2\) and \(D_3\) are already terminal: each is a one-symbol derivation with
 \(V^*(D_i)=V^q(D_i)=R(D_i)\), one deterministic number.  The fourth child
 \(C\) is the only one that continues, and the only one whose subtree contains
 an exact expression: \(V^*(C)=1\) for every target.  Root value-semantic
@@ -549,8 +549,8 @@ Both sides of \eqref{eq:inversion} are tabulated in \cref{tab:family}.  Only
 \texttt{quad\_C} the margin \(\max_iR(D_i)-V^q(C)\) is also positive, but there
 the one-action terminal is itself exact --- for \texttt{quad\_C} only to
 within round-off, \cref{rem:conditioning} --- so preferring it is correct and
-no trap exists.  A positive margin alone is not deception; the second inequality
-of \eqref{eq:inversion} is what separates the two cases.
+no trap exists.  The second inequality of \eqref{eq:inversion}, not the margin
+alone, separates the two cases.
 
 \begin{table}[thbp!]
     \centering
@@ -582,13 +582,13 @@ of \eqref{eq:inversion} is what separates the two cases.
 
 \paragraph{The last term is the expensive one.}
 Panel~(a) plots the reward ceiling: the best \(R^2\) any terminal of \(\ell\)
-tokens attains.  For \texttt{quad\_B} the ceiling is \(0.997213\) already at
+symbols attains.  For \texttt{quad\_B} the ceiling is \(0.997213\) already at
 \(\ell=5\), stays there at \(\ell=7\) and \(\ell=9\), and reaches \(1\) only at
 \(\ell=11\).  Three of the five actions of an optimal derivation buy
-\(0.0028\) of \(R^2\) between them.  This is the trap of \eqref{eq:inversion}
-displaced one level down: not a decoy action at the root, but a plateau inside
-the continue branch, where a fitted \emph{line} through a parabola whose vertex
-sits at \(x_v=5\), far outside the domain, already explains \(99.7\%\) of the
+\(0.0028\) of \(R^2\) between them.  The trap of \eqref{eq:inversion} reappears
+one level down as a plateau inside the continue branch, not a decoy action at
+the root: a fitted \emph{line} through a parabola whose vertex sits at
+\(x_v=5\), far outside the domain, already explains \(99.7\%\) of the
 variance.
 
 \paragraph{Rarity is a property of the target's support.}

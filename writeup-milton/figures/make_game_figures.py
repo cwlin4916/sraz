@@ -463,7 +463,7 @@ def panel_no_deadend(ax, F: Facts):
             rotation=90, fontsize=7.6, color=C_BAD, ha="left", va="bottom")
     ax.set_yscale("log")
     ax.set_xlim(0, F.L + 2.2)
-    ax.set_xlabel("tokens in the terminal expression", fontsize=9)
+    ax.set_xlabel("symbols in the terminal expression", fontsize=9)
     ax.set_ylabel("terminals", fontsize=9)
     ax.set_title(f"(c)  no dead ends, and a hard length bound\n"
                  f"longest terminal {max(ks)} = state_len − 1; the escape "
