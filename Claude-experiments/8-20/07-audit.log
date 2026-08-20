@@ -1,0 +1,40 @@
+MDP: ADDITIVE_GRAMMAR (4 productions), L=12, tau=1e-06
+targets: quad_A, quad_B, quad_C, quad_D
+
+census: {'reachable': 4898, 'terminal': 247, 'nonterminal': 4651}   (writeup: {'reachable': 4898, 'terminal': 247, 'nonterminal': 4651})
+terminals by length: {1: 1, 3: 2, 5: 5, 7: 14, 9: 48, 11: 177}
+           (writeup: {1: 1, 3: 2, 5: 5, 7: 14, 9: 48, 11: 177})
+
+mask cross-check vs real game: 542 states, 0 mismatches
+
+--- quad_A: 1.0 + -1.0*x + 2.0*x**2
+    support P = [0, 1, 2]   exact-expr R = 1.000000000000   fresh fits = 247
+    R(D1)=-0.0000  R(D2)=-1.0000  R(D3)=-0.0711
+    V*(C)=1.000000  Vq(C)=0.3540  rho(C)=0.1128  margin=-0.3540  ---
+    root: V*=1.000000  Vq=-0.1793  rho=0.0282  (rho(s0)/rho(C)=0.25)
+
+--- quad_B: 6.0 + -5.0*x + 0.5*x**2
+    support P = [0, 1, 2]   exact-expr R = 1.000000000000   fresh fits = 247
+    R(D1)=+0.0000  R(D2)=-1.0000  R(D3)=-1.0000
+    V*(C)=1.000000  Vq(C)=0.1563  rho(C)=0.1128  margin=-0.1563  ---
+    root: V*=1.000000  Vq=-0.4609  rho=0.0282  (rho(s0)/rho(C)=0.25)
+
+--- quad_C: 0.001 + 0.001*x + 1000.0*x**2
+    support P = [0, 1, 2]   exact-expr R = 1.000000000000   fresh fits = 247
+    R(D1)=+0.0000  R(D2)=-1.0000  R(D3)=+1.0000
+    V*(C)=1.000000  Vq(C)=0.4840  rho(C)=0.5569  margin=+0.5160  ---
+    root: V*=1.000000  Vq=0.1210  rho=0.3892  (rho(s0)/rho(C)=0.698925909688733)
+
+--- quad_D: -0.48 + 0.4*x + 2.0*x**2
+    support P = [0, 1, 2]   exact-expr R = 1.000000000000   fresh fits = 247
+    R(D1)=+0.0000  R(D2)=+0.0170  R(D3)=+0.6461
+    V*(C)=1.000000  Vq(C)=0.5106  rho(C)=0.1128  margin=+0.1355  TRAP
+    root: V*=1.000000  Vq=0.2934  rho=0.0282  (rho(s0)/rho(C)=0.25)
+
+========================================================================
+Table 2 reproduced exactly for 4 target(s) (tol 5e-4 on every checked field).
+
+wrote Claude-experiments/8-20/07-exact-audit.json
+wrote Claude-experiments/8-20/07-exact-audit.md
+
+All checks passed.

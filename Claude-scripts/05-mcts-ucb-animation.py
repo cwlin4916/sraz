@@ -1,9 +1,12 @@
 #!/usr/bin/env python
-"""Animate the root UCB terms of a pure-MCTS search on sine (seed 42).
+"""Animate the root UCB terms of a pure-MCTS search.
+
+Works on sine (the default, 7 first-move actions) and on any named family
+target (ADDITIVE_GRAMMAR at L=12, 4 first-move actions) -- see --problem.
 
 Companion to 04-mcts-tree-animation.py. Same search, same fidelity, but the
 focus moves from "which node gets expanded" to "why that node got picked":
-every frame decomposes the selection score of all 7 first-move actions into
+every frame decomposes the selection score of every first-move action into
 its two summands, exactly as calc_masked_ucbs computes them (mcts.py:479):
 
     UCB(a) = Qtilde(a)  +  c * P(a) * sqrt(N_tot + EPS) / (1 + N(a))
@@ -37,8 +40,19 @@ budget are reset once and then accumulate -- faithful to one perform_simulations
 of `--sims` simulations. Axis limits are computed in a first pass so nothing
 rescales mid-animation. Fits are memoised from the seed-42 cache.
 
+NOTE ON WHICH ALGORITHM THIS IS. The rule above is AlphaZero-style PUCT, the
+searcher this repo ships. It is NOT the writeup's eq. (17) Mean-UCT, which uses
+Qbar + sqrt(2 log N(s) / N(s,a)) on raw rewards and gives unvisited actions an
+infinite score. Three differences matter: sqrt(N) vs sqrt(log N); `1 + N(a)` in
+the denominator, so an unvisited action is NOT forced and can be skipped
+indefinitely; and the min-max normalisation of Q, which silently rescales the
+constant the writeup holds fixed. Conclusions drawn from these animations
+describe the shipped searcher, not the writeup's algorithm.
+
 Run from repo root:
     .venv/bin/python Claude-scripts/05-mcts-ucb-animation.py --sims 40 --fps 1.5
+    .venv/bin/python Claude-scripts/05-mcts-ucb-animation.py \
+        --problem lin_A --sims 64 --rollout-n 1 --rollout-budget 10000000
 """
 
 from __future__ import annotations
@@ -195,7 +209,7 @@ def render(snap, ctx, lim, n_sims, seed) -> Image.Image:
     lv = snap["leaf_val"]
     lvtxt = f"leaf value backed up = {lv:+.3f}" if lv is not None else "terminal (exact)"
     fig.suptitle(
-        f"Pure MCTS root selection  |  sine (seed {seed})  |  "
+        f"Pure MCTS root selection  |  {ctx['label']}  |  "
         f"c = {ctx['c']:g}  |  "
         f"simulation {snap['t']}/{n_sims}   (state shown = before this simulation)\n"
         f"argmax UCB selects:  {lab[pick]}          {lvtxt}          "
@@ -282,6 +296,12 @@ def main():
     ap.add_argument("--rollout-budget", type=int, default=None,
                     help="override the shared per-move rollout step budget "
                          "(MCTS default 500 starves after ~6 leaf evaluations)")
+    ap.add_argument("--rollout-n", type=int, default=None,
+                    help="random completions per leaf evaluation. Left unset "
+                         "the pure_mcts config default of 20 applies, which is "
+                         "what the existing sine GIFs used. Pass 1 to make one "
+                         "simulation cost exactly one terminal evaluation, as "
+                         "the writeup's evaluation protocol requires.")
     ap.add_argument("--out-dir", default=None,
                     help="output directory (default: the 8-5 experiment folder)")
     ap.add_argument("--dpi", type=int, default=88,
@@ -292,7 +312,16 @@ def main():
                  if args.problem == "sine" else args.problem)
     anim.install_fit_memo(cache_key)
 
-    cfg = SymRegConfig(problem=args.problem, pure_mcts=True)
+    # `problems.PROBLEMS` only knows "sine" and "additive_quadratic", so a
+    # family target name cannot be the config's `problem` -- get_problem would
+    # raise. SymRegConfig.build() already handles "named target + problem
+    # supplies the grammar" (config.py:96-100); it just has to be fed that way.
+    if args.problem == "sine":
+        cfg = SymRegConfig(problem="sine", pure_mcts=True)
+    else:
+        cfg = SymRegConfig(problem="additive_quadratic", pure_mcts=True)
+        cfg.game.kwargs["target"] = args.problem
+        cfg.game.kwargs["max_len"] = 12
     cfg.game.kwargs["problem_seed"] = args.problem_seed
     cfg.game.kwargs["redraw_constants"] = False
     _, net, agent, _ = cfg.build()
@@ -316,6 +345,8 @@ def main():
         overrides["c_exploration"] = float(args.c_exploration)
     if args.rollout_budget is not None:
         overrides["rollout_budget"] = int(args.rollout_budget)
+    if args.rollout_n is not None:
+        overrides["rollout_n"] = int(args.rollout_n)
     mcts = MCTS(root, net, rng=np.random.default_rng(args.seed),
                 **{**params, **overrides})
     print(f"[mcts] c_exploration={mcts.c_exploration:g}  "
@@ -396,7 +427,12 @@ def main():
         "maxN": max(1, max(n for s in snaps for n, _ in s["estats"].values())),
     }
 
-    ctx = {"nodes": nodes, "pos": pos, "node_state": node_state,
+    # The title used to hard-code "sine"; a family run needs its own label, and
+    # the sine label must come out byte-identical so existing GIFs still match.
+    label = (f"sine (seed {args.problem_seed})" if args.problem == "sine"
+             else f"{args.problem}   y = {root.target_infix}")
+    ctx = {"label": label,
+           "nodes": nodes, "pos": pos, "node_state": node_state,
            "edge_action": edge_action, "root_children": root_children,
            "expr": expr, "acts": acts, "lab": lab,
            "obs_to_id": {st: nid for nid, st in node_state.items()},
@@ -425,7 +461,10 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     ctag = f"_c{mcts.c_exploration:g}".replace(".", "p")
     rtag = "" if args.rollout_budget is None else f"_rb{args.rollout_budget}"
-    gif = out_dir / f"mcts-ucb_{cache_key}{ctag}{rtag}.gif"
+    # rollout_n changes what one simulation COSTS (n terminal evaluations), so it
+    # belongs in the name. Empty when unset, keeping existing sine names valid.
+    ntag = "" if args.rollout_n is None else f"_rn{args.rollout_n}"
+    gif = out_dir / f"mcts-ucb_{cache_key}{ctag}{rtag}{ntag}_s{args.sims}.gif"
     hold = [frames[-1]] * max(1, int(round(args.fps * 3)))
     seq = frames + hold
     seq[0].save(gif, save_all=True, append_images=seq[1:],

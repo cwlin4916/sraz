@@ -1,0 +1,13 @@
+[memo] preloaded 0 fits
+[mcts] params: {'n_simulations': 25, 'temperature': 1.0, 'c_exploration': 1.0, 'backup_rule': 'mean', 'rollout_n': 20, 'rollout_blend': 0.0}
+target: 6.0 + -5.0*x + 0.5*x**2  constants: {'c0': 6.0, 'c1': -5.0, 'c2': 0.5}
+[tree] 9 nodes; 4 first-move options
+[mcts] c_exploration=1  rollout_n=1  rollout_budget=1000
+
+final first-move visit counts:
+  N= 55  Q=+0.744  + S S
+  N=  4  Q=+0.000  C0
+  N=  2  Q=-1.000  * C1 x
+  N=  2  Q=-1.000  * C2 * x x
+=> greedy first move: + S S
+[saved] /home/ec2-user/projects/sraz/Claude-experiments/8-20/quad_B/mcts-tree_quad_B_c1_rb1000_rn1_s64.gif  (64 frames)
