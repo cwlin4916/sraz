@@ -194,7 +194,7 @@ def replay_selection(mcts, root):
 # rendering
 # --------------------------------------------------------------------------
 def render(mcts, root, nodes, pos, node_state, edge_action, root_children,
-           expr, path, sim_idx, n_sims, seed):
+           expr, path, sim_idx, n_sims, label):
     obs_to_id = {st: nid for nid, st in node_state.items()}
     path_ids = [obs_to_id.get(st) for st in path]
     path_edges = {(a, b) for a, b in zip(path_ids, path_ids[1:])
@@ -287,7 +287,7 @@ def render(mcts, root, nodes, pos, node_state, edge_action, root_children,
     rvtxt = (f"leaf rollout R² = {leaf_val:+.3f}"
              if leaf_val is not None else "leaf: net value")
     axT.set_title(
-        f"Pure MCTS · sine (seed {seed}) · first-move search · "
+        f"Pure MCTS · {label} · first-move search · "
         f"simulation {sim_idx}/{n_sims}\n"
         f"greedy first move so far:  {gtxt}     |     this sim: {rvtxt}",
         fontsize=11)
@@ -332,13 +332,35 @@ def main():
     ap.add_argument("--sims", type=int, default=64, help="simulations to animate")
     ap.add_argument("--seed", type=int, default=42, help="MCTS rollout RNG seed")
     ap.add_argument("--fps", type=float, default=4.0)
+    ap.add_argument("--c-exploration", type=float, default=None,
+                    help="override the config's exploration constant")
+    ap.add_argument("--rollout-budget", type=int, default=None,
+                    help="override the shared per-move rollout step budget "
+                         "(MCTS default 500 starves after ~6 leaf evaluations)")
+    ap.add_argument("--rollout-n", type=int, default=None,
+                    help="random completions per leaf evaluation. Left unset "
+                         "the pure_mcts config default of 20 applies, which is "
+                         "what the existing sine GIFs used. Pass 1 to make one "
+                         "simulation cost exactly one terminal evaluation, as "
+                         "the writeup's evaluation protocol requires.")
+    ap.add_argument("--out-dir", default=None,
+                    help="output directory (default: the 8-5 experiment folder)")
     args = ap.parse_args()
 
     cache_key = (f"{args.problem}_seed{args.problem_seed}"
                  if args.problem == "sine" else args.problem)
     install_fit_memo(cache_key)
 
-    cfg = SymRegConfig(problem=args.problem, pure_mcts=True)
+    # `problems.PROBLEMS` only knows "sine" and "additive_quadratic", so a
+    # family target name cannot be the config's `problem` -- get_problem would
+    # raise. SymRegConfig.build() already handles "named target + problem
+    # supplies the grammar" (config.py:96-100); it just has to be fed that way.
+    if args.problem == "sine":
+        cfg = SymRegConfig(problem="sine", pure_mcts=True)
+    else:
+        cfg = SymRegConfig(problem="additive_quadratic", pure_mcts=True)
+        cfg.game.kwargs["target"] = args.problem
+        cfg.game.kwargs["max_len"] = 12
     cfg.game.kwargs["problem_seed"] = args.problem_seed
     cfg.game.kwargs["redraw_constants"] = False
     _, net, agent, _ = cfg.build()
@@ -350,6 +372,11 @@ def main():
     print(f"target: {root.target_infix}  constants: "
           + str({k: round(v, 3) for k, v in root.constants.items()}))
 
+    # The title used to hard-code "sine"; a family run needs its own label, and
+    # the sine label must come out byte-identical so existing GIFs still match.
+    label = (f"sine (seed {args.problem_seed})" if args.problem == "sine"
+             else f"{args.problem}   y = {root.target_infix}")
+
     nodes = build_tree(root, 2)
     pos = layout(nodes)
     node_state, edge_action = build_maps(root.clone(), nodes)
@@ -357,8 +384,17 @@ def main():
     expr = {n["id"]: svg.decode(n["tokens"], root.grammar.tokenlist) for n in nodes}
     print(f"[tree] {len(nodes)} nodes; {len(root_children)} first-move options")
 
+    overrides = {"n_simulations": 1, "temperature": 0.01}
+    if args.c_exploration is not None:
+        overrides["c_exploration"] = float(args.c_exploration)
+    if args.rollout_budget is not None:
+        overrides["rollout_budget"] = int(args.rollout_budget)
+    if args.rollout_n is not None:
+        overrides["rollout_n"] = int(args.rollout_n)
     mcts = MCTS(root, net, rng=np.random.default_rng(args.seed),
-                **{**params, "n_simulations": 1, "temperature": 0.01})
+                **{**params, **overrides})
+    print(f"[mcts] c_exploration={mcts.c_exploration:g}  "
+          f"rollout_n={mcts.rollout_n}  rollout_budget={mcts.rollout_budget}")
     # drive exactly one perform_simulations of `sims` searches: reset the shared
     # rollout budget and q-normalisation stats once, then accumulate.
     mcts.q_min, mcts.q_max = float("inf"), float("-inf")
@@ -372,7 +408,7 @@ def main():
         mcts.game = mcts.game.unstash_state(old)
         frames.append(render(mcts, root, nodes, pos, node_state, edge_action,
                              root_children, expr, path, t + 1, args.sims,
-                             args.problem_seed))
+                             label))
 
     # report final root distribution
     rN, rQ = _edge_stats(mcts.nodes.get(node_state[0]))
@@ -384,13 +420,19 @@ def main():
         print(f"  N={rN.get(a,0):>3}  Q={rQ.get(a, float('nan')):+.3f}  {expr[c]}")
     print(f"=> greedy first move: {expr[greedy]}")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    gif = OUT_DIR / f"mcts-tree_{cache_key}.gif"
+    out_dir = (Path(args.out_dir) if args.out_dir else OUT_DIR).resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ctag = f"_c{mcts.c_exploration:g}".replace(".", "p")
+    rtag = "" if args.rollout_budget is None else f"_rb{args.rollout_budget}"
+    # rollout_n changes what one simulation COSTS (n terminal evaluations), so it
+    # belongs in the name. Empty when unset, keeping existing sine names valid.
+    ntag = "" if args.rollout_n is None else f"_rn{args.rollout_n}"
+    gif = out_dir / f"mcts-tree_{cache_key}{ctag}{rtag}{ntag}_s{args.sims}.gif"
     hold = [frames[-1]] * int(args.fps * 2)          # linger on the final frame
     (frames + hold)[0].save(
         gif, save_all=True, append_images=(frames + hold)[1:],
         duration=int(1000 / args.fps), loop=0)
-    print(f"[saved] {gif.relative_to(REPO)}  ({len(frames)} frames)")
+    print(f"[saved] {gif}  ({len(frames)} frames)")
 
 
 if __name__ == "__main__":

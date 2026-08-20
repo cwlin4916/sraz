@@ -1,0 +1,204 @@
+{
+  "mdp": {
+    "grammar": "ADDITIVE_GRAMMAR",
+    "productions": [
+      [
+        "+",
+        "S",
+        "S"
+      ],
+      [
+        "C0"
+      ],
+      [
+        "*",
+        "C1",
+        "x"
+      ],
+      [
+        "*",
+        "C2",
+        "*",
+        "x",
+        "x"
+      ]
+    ],
+    "max_len": 12,
+    "tau": 1e-06,
+    "root_actions": 4,
+    "exact_sentence": "+ C0 + * C1 x * C2 * x x"
+  },
+  "census": {
+    "reachable": 4898,
+    "terminal": 247,
+    "nonterminal": 4651
+  },
+  "terminals_by_length": {
+    "1": 1,
+    "3": 2,
+    "5": 5,
+    "7": 14,
+    "9": 48,
+    "11": 177
+  },
+  "census_expected": {
+    "reachable": 4898,
+    "terminal": 247,
+    "nonterminal": 4651
+  },
+  "parity_expected": {
+    "1": 1,
+    "3": 2,
+    "5": 5,
+    "7": 14,
+    "9": 48,
+    "11": 177
+  },
+  "mask_validation": {
+    "states_checked": 542,
+    "mismatches": 0
+  },
+  "rows": [
+    {
+      "target": "lin_A",
+      "infix": "0.5 + 2.0*x",
+      "coeffs": [
+        0.5,
+        2.0
+      ],
+      "support": [
+        0,
+        1
+      ],
+      "R_D1": 0.0,
+      "R_D2": 0.8214285714285714,
+      "R_D3": -0.07928628162941109,
+      "V_star_C": 1.0,
+      "V_q_C": 0.5645558820581685,
+      "rho_C": 0.39452622653034974,
+      "margin": 0.25687268937040286,
+      "inversion_trap": true,
+      "V_star_s0": 1.0,
+      "V_q_s0": 0.3266745429643322,
+      "rho_s0": 0.09863155663258744,
+      "R_exact_sentence": 1.0,
+      "length_ceiling": {
+        "1": 0.0,
+        "3": 0.8214285714285714,
+        "5": 1.0,
+        "7": 1.0,
+        "9": 1.0,
+        "11": 1.0
+      },
+      "n_exact_terminals": 146,
+      "fresh_fits": 247,
+      "rho_s0_over_rho_C": 0.25
+    },
+    {
+      "target": "lin_B",
+      "infix": "5.0 + 1.0*x",
+      "coeffs": [
+        5.0,
+        1.0
+      ],
+      "support": [
+        0,
+        1
+      ],
+      "R_D1": 0.0,
+      "R_D2": -1.0,
+      "R_D3": -1.0,
+      "V_star_C": 1.0,
+      "V_q_C": 0.13410955986368311,
+      "rho_C": 0.39452622653034974,
+      "margin": -0.13410955986368311,
+      "inversion_trap": false,
+      "V_star_s0": 1.0,
+      "V_q_s0": -0.46647261003407925,
+      "rho_s0": 0.09863155663258744,
+      "R_exact_sentence": 1.0,
+      "length_ceiling": {
+        "1": 0.0,
+        "3": 0.0,
+        "5": 1.0,
+        "7": 1.0,
+        "9": 1.0,
+        "11": 1.0
+      },
+      "n_exact_terminals": 146,
+      "fresh_fits": 247,
+      "rho_s0_over_rho_C": 0.25
+    },
+    {
+      "target": "lin_C",
+      "infix": "1000.0 + 0.001*x",
+      "coeffs": [
+        1000.0,
+        0.001
+      ],
+      "support": [
+        0,
+        1
+      ],
+      "R_D1": 0.0,
+      "R_D2": -1.0,
+      "R_D3": -1.0,
+      "V_star_C": 1.0,
+      "V_q_C": 0.1341095598628334,
+      "rho_C": 0.39452622653034974,
+      "margin": -0.1341095598628334,
+      "inversion_trap": false,
+      "V_star_s0": 1.0,
+      "V_q_s0": -0.46647261003429163,
+      "rho_s0": 0.09863155663258744,
+      "R_exact_sentence": 0.9999999999999081,
+      "length_ceiling": {
+        "1": 0.0,
+        "3": 0.0,
+        "5": 1.0,
+        "7": 1.0,
+        "9": 1.0,
+        "11": 1.0
+      },
+      "n_exact_terminals": 146,
+      "fresh_fits": 247,
+      "rho_s0_over_rho_C": 0.25
+    },
+    {
+      "target": "lin_D",
+      "infix": "0.0 + 2.0*x",
+      "coeffs": [
+        0.0,
+        2.0
+      ],
+      "support": [
+        1
+      ],
+      "R_D1": 0.0,
+      "R_D2": 1.0,
+      "R_D3": -2.220446049250313e-16,
+      "V_star_C": 1.0,
+      "V_q_C": 0.5924428931970165,
+      "rho_C": 0.5924428931970165,
+      "margin": 0.4075571068029835,
+      "inversion_trap": false,
+      "V_star_s0": 1.0,
+      "V_q_s0": 0.39811072329925407,
+      "rho_s0": 0.3981107232992541,
+      "R_exact_sentence": 1.0,
+      "length_ceiling": {
+        "1": 0.0,
+        "3": 1.0,
+        "5": 1.0,
+        "7": 1.0,
+        "9": 1.0,
+        "11": 1.0
+      },
+      "n_exact_terminals": 152,
+      "fresh_fits": 247,
+      "rho_s0_over_rho_C": 0.6719816000339169
+    }
+  ],
+  "table2_failures": [],
+  "ok": true
+}

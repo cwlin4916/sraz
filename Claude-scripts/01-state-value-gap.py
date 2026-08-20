@@ -50,7 +50,8 @@ from pathlib import Path
 
 import numpy as np
 
-from sraz.instances.symreg.game import SymRegGame, fit_expression
+from sraz.instances.symreg.game import (ADDITIVE_GRAMMAR, SymRegGame,
+                                        fit_expression)
 
 # --------------------------------------------------------------------------
 # Paths
@@ -74,7 +75,12 @@ def build_game(problem: str, problem_seed: int) -> SymRegGame:
     """
     if problem == "sine":
         return SymRegGame(problem_seed=problem_seed)
-    return SymRegGame(target=problem)   # named targets fix their own coeffs
+    # A named family target fixes its own coefficients AND belongs to the
+    # controlled study's MDP: ADDITIVE_GRAMMAR at L=12. Without these two
+    # kwargs SymRegGame would silently fall back to the sine grammar at
+    # max_len=15 (game.py:216,228) -- the same tree, wrong environment.
+    return SymRegGame(target=problem, grammar_rules=ADDITIVE_GRAMMAR,
+                      max_len=12)
 
 
 def leftmost_nt(state: tuple[int, ...], nonterms: set[int]) -> int:

@@ -1,0 +1,20 @@
+=== depth-2 tree, expansion=all: 13 nodes (3 terminal) ===
+    MDP: 4898 reachable forms, 247 terminals, L=12, tau=1e-06
+
+--- quad_A: y = 1.0 + -1.0*x + 2.0*x**2
+    mean-backup would pick  C (Vq=+0.3540, V*=1.0000);  optimal is  C (Vq=+0.3540, V*=1.0000)  ->  no inversion
+    [saved] Claude-experiments/8-20/quad_A/tree_quad_A_depth2.png
+
+--- quad_B: y = 6.0 + -5.0*x + 0.5*x**2
+    mean-backup would pick  C (Vq=+0.1563, V*=1.0000);  optimal is  C (Vq=+0.1563, V*=1.0000)  ->  no inversion
+    [saved] Claude-experiments/8-20/quad_B/tree_quad_B_depth2.png
+
+--- quad_C: y = 0.001 + 0.001*x + 1000.0*x**2
+    mean-backup would pick D3 (Vq=+1.0000, V*=1.0000);  optimal is D3 (Vq=+1.0000, V*=1.0000)  ->  no inversion
+    [saved] Claude-experiments/8-20/quad_C/tree_quad_C_depth2.png
+
+--- quad_D: y = -0.48 + 0.4*x + 2.0*x**2
+    mean-backup would pick D3 (Vq=+0.6461, V*=0.6461);  optimal is  C (Vq=+0.5106, V*=1.0000)  ->  TRAP
+    [saved] Claude-experiments/8-20/quad_D/tree_quad_D_depth2.png
+
+[saved] Claude-experiments/8-20/tree_family_depth2.png

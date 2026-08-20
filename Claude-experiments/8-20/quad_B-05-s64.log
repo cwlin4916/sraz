@@ -1,0 +1,15 @@
+[memo] preloaded 0 fits
+target: 6.0 + -5.0*x + 0.5*x**2
+[mcts] c_exploration=1  rollout_n=1  rollout_budget=1000
+[root] expanded; leaf value -1.0000
+
+final root state:
+  N= 56  Q=+0.748  Qtilde=+0.874  u=0.035  UCB=+0.909   + S S
+  N=  4  Q=+0.000  Qtilde=+0.500  u=0.400  UCB=+0.900   C0
+  N=  2  Q=-1.000  Qtilde=+0.000  u=0.667  UCB=+0.667   * C1 x
+  N=  2  Q=-1.000  Qtilde=+0.000  u=0.667  UCB=+0.667   * C2 * x x
+  q_min=-1.0000  q_max=+1.0000
+  rollout budget: 884/1000 steps left  |  leaf evals: 43 rollout-estimated, 0 starved (fell back to nn_value)
+=> greedy first move: + S S
+=> `* C1 x` first selected at simulation 5
+[saved] Claude-experiments/8-20/quad_B/mcts-ucb_quad_B_c1_rb1000_rn1_s64.gif  (64 frames, 1.5 fps = 667 ms/frame)

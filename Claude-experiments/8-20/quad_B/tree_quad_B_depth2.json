@@ -1,0 +1,241 @@
+{
+  "target": "quad_B",
+  "infix": "6.0 + -5.0*x + 0.5*x**2",
+  "depth": 2,
+  "expansion": "all",
+  "max_len": 12,
+  "tau": 1e-06,
+  "root_choice": {
+    "greedy_id": 1,
+    "greedy_name": "C",
+    "greedy_Vq": 0.1563314382376933,
+    "greedy_Vstar": 1.0,
+    "optimal_id": 1,
+    "optimal_name": "C",
+    "optimal_Vq": 0.1563314382376933,
+    "optimal_Vstar": 1.0,
+    "is_trap": false,
+    "greedy_is_optimal": true,
+    "n_optimal_actions": 1,
+    "margin": 0.0
+  },
+  "nodes": [
+    {
+      "id": 0,
+      "depth": 0,
+      "parent": null,
+      "terminal": false,
+      "expr": "S",
+      "action": null,
+      "V_star": 1.0,
+      "V_q": -0.4609171404405767,
+      "rho": 0.028211805555555552,
+      "gap": 1.4609171404405767,
+      "R": null
+    },
+    {
+      "id": 1,
+      "depth": 1,
+      "parent": 0,
+      "terminal": false,
+      "expr": "+ S S",
+      "action": {
+        "pos": 0,
+        "prod": 0,
+        "name": "C"
+      },
+      "V_star": 1.0,
+      "V_q": 0.1563314382376933,
+      "rho": 0.11284722222222221,
+      "gap": 0.8436685617623068,
+      "R": null
+    },
+    {
+      "id": 2,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ + S S S",
+      "action": {
+        "pos": 1,
+        "prod": 0,
+        "name": "C"
+      },
+      "V_star": 1.0,
+      "V_q": 0.5801016586199123,
+      "rho": 0.22569444444444442,
+      "gap": 0.41989834138008775,
+      "R": null
+    },
+    {
+      "id": 3,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ C0 S",
+      "action": {
+        "pos": 1,
+        "prod": 1,
+        "name": "D1"
+      },
+      "V_star": 1.0,
+      "V_q": 0.38664571063133935,
+      "rho": 0.03645833333333333,
+      "gap": 0.6133542893686607,
+      "R": null
+    },
+    {
+      "id": 4,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ * C1 x S",
+      "action": {
+        "pos": 1,
+        "prod": 2,
+        "name": "D2"
+      },
+      "V_star": 1.0,
+      "V_q": 0.0017994518882311072,
+      "rho": 0.078125,
+      "gap": 0.9982005481117688,
+      "R": null
+    },
+    {
+      "id": 5,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ * C2 * x x S",
+      "action": {
+        "pos": 1,
+        "prod": 3,
+        "name": "D3"
+      },
+      "V_star": 1.0,
+      "V_q": -0.34322106818870945,
+      "rho": 0.1111111111111111,
+      "gap": 1.3432210681887096,
+      "R": null
+    },
+    {
+      "id": 6,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ S + S S",
+      "action": {
+        "pos": 2,
+        "prod": 0,
+        "name": "C"
+      },
+      "V_star": 1.0,
+      "V_q": 0.5801016586199123,
+      "rho": 0.22569444444444442,
+      "gap": 0.41989834138008775,
+      "R": null
+    },
+    {
+      "id": 7,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ S C0",
+      "action": {
+        "pos": 2,
+        "prod": 1,
+        "name": "D1"
+      },
+      "V_star": 1.0,
+      "V_q": 0.38664571063133935,
+      "rho": 0.03645833333333333,
+      "gap": 0.6133542893686607,
+      "R": null
+    },
+    {
+      "id": 8,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ S * C1 x",
+      "action": {
+        "pos": 2,
+        "prod": 2,
+        "name": "D2"
+      },
+      "V_star": 1.0,
+      "V_q": 0.0017994518882311072,
+      "rho": 0.078125,
+      "gap": 0.9982005481117688,
+      "R": null
+    },
+    {
+      "id": 9,
+      "depth": 2,
+      "parent": 1,
+      "terminal": false,
+      "expr": "+ S * C2 * x x",
+      "action": {
+        "pos": 2,
+        "prod": 3,
+        "name": "D3"
+      },
+      "V_star": 1.0,
+      "V_q": -0.34322106818870945,
+      "rho": 0.1111111111111111,
+      "gap": 1.3432210681887096,
+      "R": null
+    },
+    {
+      "id": 10,
+      "depth": 1,
+      "parent": 0,
+      "terminal": true,
+      "expr": "C0",
+      "action": {
+        "pos": 0,
+        "prod": 1,
+        "name": "D1"
+      },
+      "V_star": 0.0,
+      "V_q": 0.0,
+      "rho": 0.0,
+      "gap": 0.0,
+      "R": 0.0
+    },
+    {
+      "id": 11,
+      "depth": 1,
+      "parent": 0,
+      "terminal": true,
+      "expr": "* C1 x",
+      "action": {
+        "pos": 0,
+        "prod": 2,
+        "name": "D2"
+      },
+      "V_star": -1.0,
+      "V_q": -1.0,
+      "rho": 0.0,
+      "gap": 0.0,
+      "R": -1.0
+    },
+    {
+      "id": 12,
+      "depth": 1,
+      "parent": 0,
+      "terminal": true,
+      "expr": "* C2 * x x",
+      "action": {
+        "pos": 0,
+        "prod": 3,
+        "name": "D3"
+      },
+      "V_star": -1.0,
+      "V_q": -1.0,
+      "rho": 0.0,
+      "gap": 0.0,
+      "R": -1.0
+    }
+  ]
+}
