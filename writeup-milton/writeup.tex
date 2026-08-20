@@ -466,10 +466,12 @@ error.
 \inlinefig{figures/deadend_causes.png}
 
 \begin{rem}[Parity]
+\label{rem:parity}
 Each action changes the length by \(\lvert w\rvert-1\in\{0,2,4\}\), all even,
 and \(\lvert s_0\rvert=1\).  Every reachable form therefore has odd length, and
 terminals can only hold \(1,3,5,7,9,11\) symbols.  The census agrees exactly:
-\(1,2,5,14,48,177\) terminals at those six lengths.
+\(1,2,5,14,48,177\) terminals at those six lengths.  \Cref{app:terminal-symbols}
+lines up four reachable terminals by length.
 \end{rem}
 
 \inlinefig{figures/game_termination.png}
@@ -502,12 +504,30 @@ is monotone there, and only \texttt{quad\_D} crosses zero inside the domain.
 The word \emph{root} is reserved throughout for the MDP root \(s_0\).}
 \end{defi}
 
-\inlinefig{figures/family_targets.png}
+\noi The four linear targets, separated by where the zero falls:
+
+\inlinefig{figures/family_targets_linear.png}
+
+\noi The four quadratic targets, separated by the vertex and the discriminant:
+
+\inlinefig{figures/family_targets_quadratic.png}
 
 
 \subsection{Where the difficulty is}
 \label{subsec:difficulty}
 
+\paragraph{Key hypothesis.}
+Two mechanisms, and only two, are hypothesized to drive finite-budget
+failure of mean-based search: value-semantic failure at the root, which
+starves the branch containing the optimum, and rarity of the exact
+completion, which imposes a sample-efficiency floor no matter how search is
+allocated (\cref{subsec:values-failure-modes}).  The two are dissociable by
+construction: replacing the mean backup with a maximum backup
+(\cref{sec:experiment-two}) should cure the first and leave the second
+untouched.  What follows locates, on the eight-target family of
+\cref{def:target-family}, exactly where each mechanism appears and which
+targets isolate it --- formalized as Hypotheses~2a--2c in
+\cref{sec:experiment-two}.
 
 Exactly \(\lvert\c{A}(s_0)\rvert=4\) actions are legal at the root, one per
 production, and they have four distinct successors.  We name those four
@@ -528,20 +548,44 @@ root actions are in bijection with these four children, we also write
 for a root action is needed.\\ 
 
 \noi  Three of the four productions carry no nonterminal on the right, so \(D_1\),
-\(D_2\) and \(D_3\) are already terminal: each is a one-symbol derivation with
-\(V^*(D_i)=V^q(D_i)=R(D_i)\), one deterministic number.  The fourth child
-\(C\) is the only one that continues, and the only one whose subtree contains
-an exact expression: \(V^*(C)=1\) for every target.  Root value-semantic
-failure is therefore a single inequality,
+\(D_2\) and \(D_3\) are already terminal: each is a one-action terminal with
+\(V^*(D_i)=V^q(D_i)=R(D_i)\), one deterministic number.  Each also fits
+exactly one monomial --- \(D_1\) the constant \(1\), \(D_2\) the linear term
+\(x\), \(D_3\) the quadratic term \(x^2\) --- and we call this monomial the
+\emph{atom} of \(D_i\), indexed by its degree \(p\in\{0,1,2\}\); a general
+terminal is a sum of the atoms its derivation happens to include.  The fourth
+child \(C\) is the only one that continues, and the only one whose subtree
+contains an exact expression: \(V^*(C)=1\) for every target.  Root
+value-semantic failure is therefore a single inequality,
 \begin{equation}
     \max_i R(D_i)>V^q(C)
     \qquad\text{while}\qquad
     \max_i R(D_i)<V^*(C)=1,
     \label{eq:inversion}
 \end{equation}
-and nothing has to be added to the environment to produce it.
+and nothing has to be added to the environment to produce it.  We call
+\eqref{eq:inversion} an \emph{inversion}, and a target on which it holds a
+\emph{trap}: the one-action terminal that mean rollout prefers is not the
+one whose subtree contains the optimum.
 
-\inlinefig{figures/family_difficulty.png}
+\noi The continue branch's \([V^q(C),V^*(C)]\) interval against the three
+one-action terminals, per target:
+
+\inlinefig{figures/family_children.png}
+
+\begin{rem}[Conditioning]
+\label{rem:conditioning}
+\texttt{lin\_C} and \texttt{quad\_C} deliberately span a coefficient ratio
+of \(10^6\) (\cref{def:target-family}).  The inner fit is an iterative
+nonlinear solver (\texttt{lmfit}) even though every production here is
+linear in its constants, so on these two targets it terminates short of the
+closed-form optimum: the best terminal reaches \(R=1-8.7\times10^{-13}\) on
+\texttt{lin\_C} and \(R=1-8.1\times10^{-12}\) on \texttt{quad\_C}, against
+bit-exact \(1\) on the other six targets.  Both residuals sit far inside the
+tolerance \(\tau=10^{-6}\) of \eqref{eq:rare-mass}, so no reported value of
+\(\rho\) or \(R\) changes, but the exactness is true to floating-point
+precision rather than to the last bit.
+\end{rem}
 
 Both sides of \eqref{eq:inversion} are tabulated in \cref{tab:family}.  Only
 \texttt{lin\_A} and \texttt{quad\_D} satisfy it.  For \texttt{lin\_D} and
@@ -579,9 +623,16 @@ alone, separates the two cases.
     \label{tab:family}
 \end{table}
 
-\hfill \\ 
+\noi For the linear family, \(R(D_1),R(D_2),R(D_3)\) above also have a
+closed form in \(c_0,c_1\) (\cref{app:closed-form}).
 
-Panel~(a) plots the reward ceiling: the best \(R^2\) any terminal of \(\ell\)
+\hfill \\
+
+\noi The reward ceiling as a function of terminal length, per target:
+
+\inlinefig{figures/family_ceiling.png}
+
+The reward ceiling is the best \(R^2\) any terminal of \(\ell\)
 symbols attains.  For \texttt{quad\_B} the ceiling is \(0.997213\) already at
 \(\ell=5\), stays there at \(\ell=7\) and \(\ell=9\), and reaches \(1\) only at
 \(\ell=11\).  Three of the five actions of an optimal derivation buy
@@ -595,11 +646,27 @@ variance.
 The tree is the same for every target, so the only thing that can vary is
 which of its terminals fit.
 
+\noi Deception margin against rarity, per target:
+
+\inlinefig{figures/family_rarity.png}
+
+Each point is one target, plotted by the same two quantities as
+\eqref{eq:inversion}: the deception margin \(\max_iR(D_i)-V^q(C)\) on the
+\(x\)-axis, and the rarity \(\rho(C)\) on the \(y\)-axis, log-scaled because
+it spans an order of magnitude.  Rarity is \(\rho\) of \eqref{eq:rare-mass}
+evaluated at \(C\): the probability that a uniform random completion of the
+continue branch fits the target exactly.  A low point is therefore one where
+an exact fit is a rare event among random completions of \(C\), regardless of
+whether that branch is also a trap.  Color marks the root outcome: red for a
+trap (the shaded region, \(\max_iR(D_i)>V^q(C)\)), green where the one-action
+terminal is already exact, blue where the ordering is correct and untrapped.
+
 \begin{lem}[Rarity depends only on the support]
 \label{lem:support}
-Let \(P=\{p:c_p\neq0\}\) be the support of the target \eqref{eq:target}.  A
-terminal \(\pi\) fits it exactly iff \(\pi\) carries an atom for every
-\(p\in P\).  Hence \(\rho\) depends on the target only through \(P\), and
+Let \(P=\{p:c_p\neq0\}\) be the support of the target \eqref{eq:target}, and
+\(A(\pi)\subseteq\{0,1,2\}\) the set of atom degrees a terminal \(\pi\)
+carries.  Then \(\pi\) fits the target exactly iff \(A(\pi)\supseteq P\).
+Hence \(\rho\) depends on the target only through \(P\), and
 \[
     \rho(C)=0.5924,\quad 0.3945,\quad 0.1128
     \qquad\text{for}\qquad
@@ -608,14 +675,17 @@ terminal \(\pi\) fits it exactly iff \(\pi\) carries an atom for every
 \end{lem}
 
 \begin{proof}
-The three productions carrying no nonterminal evaluate to \(1\), \(x\) and
-\(x^2\), linearly independent on the \(41\)-point grid, and a terminal is a
-sum of such atoms.  Least squares over the atoms present is exact iff the
-target lies in their span, which for a polynomial of support \(P\) holds iff
-every \(p\in P\) is present, and is otherwise strictly inexact.  The predicate
-\(R(\pi)=1\) therefore depends on \(\pi\) only through the set of powers it
-carries, and \(\rho\), a uniform average of that predicate over completions
-\eqref{eq:backward-induction}, inherits the dependence.
+The atoms \(1,x,x^2\) are linearly independent on the \(41\)-point grid, so a
+terminal's fitted value lies in the span of the atoms in \(A(\pi)\).  If
+\(A(\pi)\supseteq P\) that span contains the target, and least squares is
+exact: any atoms beyond \(P\) do not prevent this, since their coefficients
+are simply fit to zero.  If instead some \(p\in P\) is missing from
+\(A(\pi)\), linear independence gives the target a genuinely nonzero
+component along that atom that no combination of the others can reproduce,
+so the fit is strictly inexact.  The predicate \(R(\pi)\ge1-\tau\) therefore
+depends on \(\pi\) only through \(A(\pi)\), and \(\rho\), a uniform average
+of that predicate over completions \eqref{eq:backward-induction}, inherits
+the dependence.
 \end{proof}
 
 \noi Of the \(247\) terminals, \(146\) carry both \(1\) and \(x\) while only
@@ -636,50 +706,6 @@ whereas the budget \(B\) of \eqref{eq:budget-grid} counts terminal evaluations
 anywhere in the tree.  \(K\) is what \emph{uniform} sampling from \(C\)
 needs; a tree search is bound by it in neither direction, and
 \cref{sec:experiment-two} measures the difference.
-
-\paragraph{The four cells.}
-Two binary contrasts are therefore available without writing a line of new
-environment code: whether \eqref{eq:inversion} holds, and whether exact
-completions are common (\(\rho(C)=0.39\)) or rare (\(0.11\)).
-
-\begin{center}
-\footnotesize
-\begin{tabular}{@{}lll@{}}
-    \toprule
-     & common, \(\rho(C)=0.39\) & rare, \(\rho(C)=0.11\) \\
-    \midrule
-    inversion    & \texttt{lin\_A} & \texttt{quad\_D} \\
-    no inversion & \texttt{lin\_B} & \texttt{quad\_A} \\
-    \bottomrule
-\end{tabular}
-\end{center}
-
-\noi \texttt{quad\_B} is kept as a fifth condition: no inversion at the root,
-but the \(0.997213\) plateau three actions deep.  These five targets carry the
-study.  \texttt{lin\_D} is a solved-at-once control, and the remaining two are
-excluded for the reason that follows.
-
-\begin{rem}[The two ill-conditioned members]
-\label{rem:conditioning}
-\texttt{lin\_C} and \texttt{quad\_C} are the only rows of \cref{tab:family}
-that disagree with \cref{lem:support}, and both disagree at the level of
-double-precision round-off rather than of mathematics.  \texttt{lin\_C}
-\(=10^{-3}\cdot\texttt{lin\_B}+999.995\) is an affine image of
-\texttt{lin\_B}; \(R^2\) is invariant under affine maps of \(y\) for every
-atom set containing \texttt{C0}, and every set without one clips to \(-1\), so
-the two are the same problem and their \(V^q(C)\) agree to
-\(3\times10^{-11}\).  Its exact fits nevertheless return
-\(R=1-5.6\times10^{-12}\), so \(\rho(C)\) collapses to \(0.2817\) as soon as
-\(\tau<5.6\times10^{-12}\).  \texttt{quad\_C} fails the other way: the single
-atom \texttt{* C2 * x x} returns \(R=1-8.1\times10^{-12}\), which
-\(\tau=10^{-6}\) reads as exact --- whence \(R(D_3)=1\) and \(\rho(C)=0.5569\)
-in \cref{tab:family} --- and which any \(\tau<8.1\times10^{-12}\) reads as
-inexact, restoring \(\rho(C)=0.1128\).  The window admitting both rows is
-\([5.6,8.1)\times10^{-12}\), narrower than a factor of \(1.5\), so no tolerance
-makes both mean what they say.  On the other six targets every exact fit
-returns \(R^2=1\) to the last bit, and every \(\rho\) reported here is
-unchanged for all \(\tau\in[0,10^{-6}]\).
-\end{rem}
 
 \section{Experiment 1: exact value-semantic audit}
 \label{sec:experiment-one}
@@ -1026,6 +1052,55 @@ whether a learned policy or value function corrects the pure-search failures
 identified here --- or instead learns and amplifies the biased targets
 produced by mean-return search --- is deferred, so that the present study
 remains causally interpretable.
+
+\appendix
+
+\section{Symbols in a terminal expression}
+\label{app:terminal-symbols}
+
+A \emph{symbol} is one cell of the state buffer of
+\cref{def:derivation-mdp} --- what \cref{prop:length-bound} and
+\cref{rem:parity} count.  It is not the same as a \emph{term} of the fitted
+polynomial: written by hand \(c_0+c_1x\) has two terms, but as a buffer
+string it is the five-symbol \texttt{+ C0 * C1 x}, and the three-term
+\(c_0+c_1x+c_2x^2\) is the eleven-symbol string already named in
+\cref{subsec:termination}.  Below, four reachable terminals lined up by
+length, symbols on the left and the same expression regrouped on the right;
+length skips straight from \(1\) to \(3\) to \(5\) because \cref{rem:parity}
+makes every even length unreachable.
+
+\inlinefig{figures/terminal_lengths.png}
+
+\section{Closed-form root values for the linear family}
+\label{app:closed-form}
+
+For a linear target \(c_0+c_1x\) (\(c_1\neq0\)), the reward at each
+one-action terminal of \cref{subsec:difficulty} has a closed form, on the
+\(n=41\)-point symmetric grid where \(\sum_ix_i=\sum_ix_i^3=0\) and
+\[
+    \mu_2=\tfrac1n\sum_ix_i^2=0.35,
+    \qquad
+    \mu_4=\tfrac1n\sum_ix_i^4=0.220325.
+\]
+\(D_1\) fits only the constant atom, so its fitted value is the mean \(c_0\)
+and \(R(D_1)=0\) always.  \(D_2\) fits only the linear atom; \(\sum_ix_i=0\)
+makes that fit isolate \(c_1\) exactly and leave the constant entirely
+unexplained, so
+\begin{equation}
+    R(D_2)=\operatorname{clip}\!\left(1-\frac1{\mu_2}\Bigl(\frac{c_0}{c_1}\Bigr)^{2},-1,1\right).
+    \label{eq:closed-form-d2}
+\end{equation}
+\(D_3\) fits only the quadratic atom; \(\sum_ix_i^3=0\) makes it blind to the
+linear term entirely, so
+\begin{equation}
+    R(D_3)=\operatorname{clip}\!\left(-\frac{c_0^2}{c_1^2\mu_2}\Bigl(1-\frac{\mu_2^2}{\mu_4}\Bigr),-1,1\right)\le0,
+    \label{eq:closed-form-d3}
+\end{equation}
+strict whenever \(c_0\neq0\), since \(\mu_4>\mu_2^2\) by the linear
+independence of \(1\) and \(x^2\) on the grid.  Both formulas verify exactly
+against \cref{tab:family}: \((c_0/c_1)^2=0.0625\) for \texttt{lin\_A} against
+\(\mu_2=0.35\) keeps \eqref{eq:closed-form-d2} at \(0.8214\), high enough to
+trap, while \((c_0/c_1)^2=25\) for \texttt{lin\_B} drives it to \(-1\).
 
 % =====================================================================
 \bibliographystyle{plain}

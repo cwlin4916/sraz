@@ -1,19 +1,35 @@
 """Figures for the minimal controlled family, and for the action encoding.
 
-Three PNGs, one per definition or claim, all computed by running the real
-game -- nothing here is transcribed by hand:
+Computed by running the real game -- nothing here is transcribed by hand:
 
-    action_index.png     why an action is an integer in {0, ..., LP-1}: the
-                         L x P grid of (pos, prod) pairs, and one decode.
+    action_index.png              why an action is an integer in
+                                   {0, ..., LP-1}: the L x P grid of
+                                   (pos, prod) pairs, and one decode.
 
-    family_targets.png   the eight named polynomial targets of
-                         ``sraz.instances.symreg.targets`` on the plane, and
-                         the two invariants that partition them.
+    family_targets_linear.png     the four linear targets of
+                                   ``sraz.instances.symreg.targets`` on the
+                                   plane, and the invariant that separates
+                                   them (where the zero falls).
 
-    family_difficulty.png  where the difficulty sits for that family, under one
-                         fixed MDP: the reward ceiling as a function of
-                         expression length, the four root children, and the
-                         deception/rarity plane.
+    family_targets_quadratic.png  the four quadratic targets, and the two
+                                   invariants that separate them (vertex,
+                                   discriminant).
+
+    family_ceiling.png            the reward ceiling as a function of
+                                   expression length, for all eight targets.
+
+    family_children.png           the four children of the root, per target:
+                                   the continue branch's [V^q(C), V*(C)]
+                                   interval against the three one-action
+                                   decoys.
+
+    family_rarity.png             the deception margin against the
+                                   exact-completion rarity rho(C), per
+                                   target.
+
+    terminal_lengths.png          appendix figure: four reachable terminals
+                                   at increasing length, buffer symbols next
+                                   to the same expression regrouped.
 
 The MDP is held fixed (ADDITIVE_GRAMMAR, L = 12): all eight targets share the
 same 4,898 reachable forms and the same 247 terminals, so the target is the
@@ -44,7 +60,7 @@ from make_mdp_figures import (  # noqa: E402
     C_CONT, C_CONT_BG, C_DEAD, C_DECOY, C_DECOY_BG, C_OK, C_TGT, HERE, box,
 )
 from sraz.instances.symreg.game import ADDITIVE_GRAMMAR, SymRegGame  # noqa: E402
-from sraz.instances.symreg.targets import TARGETS  # noqa: E402
+from sraz.instances.symreg.targets import TARGETS, family_targets  # noqa: E402
 
 sys.setrecursionlimit(100_000)
 
@@ -249,7 +265,60 @@ def fig_action_index(fam: Family, out="action_index.png"):
 
 
 # ===========================================================================
-# FIGURE -- family_targets.png : the family, on the plane
+# FIGURE -- terminal_lengths.png : symbols in a terminal expression (appendix)
+# ===========================================================================
+def fig_terminal_lengths(fam: Family, out="terminal_lengths.png"):
+    """Four reachable terminals at increasing length: buffer symbols on the
+    left, the same expression regrouped left-to-right on the right."""
+    rows = [
+        ("C0", "C0"),
+        ("* C2 * x x", "C2*x*x"),
+        ("+ * C1 x * C2 * x x", "C1*x + C2*x*x"),
+        ("+ C0 + * C1 x * C2 * x x", "C0 + C1*x + C2*x*x"),
+    ]
+    have = {fam.decode(s): len(s) for s in fam.terminals}
+    for expr, _ in rows:
+        assert expr in have, f"{expr!r} is not a reachable terminal"
+
+    fig, ax = plt.subplots(figsize=(9.4, 4.3))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    ax.grid(False)
+
+    ch, cw = 0.12, 0.049
+    ys = [0.80, 0.575, 0.35, 0.125]
+    for (expr, gloss), y in zip(rows, ys):
+        toks = expr.split()
+        n = have[expr]
+        for i, tok in enumerate(toks):
+            ax.add_patch(plt.Rectangle(
+                (0.02 + i * cw, y - ch / 2), cw * 0.90, ch,
+                facecolor="#f2f2f2", edgecolor="#c8c8c8", linewidth=1.0))
+            ax.text(0.02 + i * cw + cw * 0.45, y, tok, ha="center", va="center",
+                    fontsize=9.4, family=MONO, color=C_TGT)
+        ax.text(0.02 + len(toks) * cw + 0.035, y, f"=  {gloss}", fontsize=10.4,
+                family=MONO, va="center", color="#333333")
+        ax.text(0.02, y + ch / 2 + 0.045,
+                f"{n} symbol{'s' if n != 1 else ''}",
+                fontsize=8.4, color="#666666", va="bottom")
+
+    ax.text(0.02, 1.0,
+            "each row: one reachable terminal, at $L=12$",
+            fontsize=8.8, color="#555555", va="top")
+    ax.text(0.02, 0.0,
+            "lengths are always odd -- 1, 3, 5, 7, 9, 11 symbols -- because "
+            "each application of '+ S S' adds two symbols",
+            fontsize=8.4, color="#555555", va="bottom")
+    ax.set_title("symbols in a terminal expression", fontsize=10.5, loc="left")
+
+    fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print("wrote", out)
+
+
+# ===========================================================================
+# FIGURES -- family_targets_linear.png, family_targets_quadratic.png
 # ===========================================================================
 def pretty(coeffs) -> str:
     """'y = 1 - x + 2x^2', the way one would write it by hand."""
@@ -268,66 +337,41 @@ def pretty(coeffs) -> str:
     return "$y = " + " ".join(parts) + "$"
 
 
-def fig_family(fam: Family, out="family_targets.png"):
-    fig = plt.figure(figsize=(13.2, 5.8))
-    gs = GridSpec(2, 6, width_ratios=[1, 1, 1, 1, 0.18, 1.55],
-                  height_ratios=[1, 1], wspace=0.36, hspace=0.62,
-                  left=0.045, right=0.985, top=0.88, bottom=0.115)
-
-    names = list(TARGETS)
-    for k, name in enumerate(names):
-        tgt = TARGETS[name]
-        ax = fig.add_subplot(gs[k // 4, k % 4])
-        xs = np.linspace(tgt.x_min, tgt.x_max, 400)
-        ys = tgt.ys(xs)
-        col = C_CONT if tgt.family == "linear" else C_DECOY
-        ax.plot(xs, ys, color=col, lw=2.0)
-        ax.plot(tgt.xs(), tgt.ys(tgt.xs()), ".", color=col, ms=2.6, alpha=0.55)
-        ax.axhline(0, color="0.75", lw=0.8, zorder=1)
-        for r in tgt.roots_in_domain():
-            ax.plot([r], [0], "o", color=C_TGT, ms=5.0, zorder=5)
-        if tgt.vertex_in_domain():
-            xv = tgt.vertex
-            ax.plot([xv], [tgt.ys(np.array([xv]))[0]], "^", color=C_OK,
-                    ms=7.0, zorder=5)
-        ax.set_xlim(tgt.x_min, tgt.x_max)
-        ax.set_xticks([-1, 0, 1])
-        ax.tick_params(labelsize=8)
-        ax.set_title(name, fontsize=9.4, family=MONO, pad=18, color=col)
-        ax.text(0.5, 1.035, pretty(tgt.coeffs), transform=ax.transAxes,
-                fontsize=9.0, ha="center", va="bottom")
-        lo, hi = float(ys.min()), float(ys.max())
-        ax.text(0.03, 0.94, f"spread $\\Delta y = {hi - lo:.3g}$",
-                transform=ax.transAxes, fontsize=7.8, color="#666666",
-                va="top")
-
-    # -- the invariant plane: quadratics --------------------------------
-    ax = fig.add_subplot(gs[0, 5])
-    quads = [t for t in TARGETS.values() if t.family == "quadratic"]
-    ax.axvspan(-1, 1, color=C_CONT_BG, zorder=0)
-    ax.axhline(0, color="0.55", lw=1.0, zorder=1)
-    ax.axvline(-1, color=C_CONT, lw=0.9, ls=":", zorder=1)
-    ax.axvline(1, color=C_CONT, lw=0.9, ls=":", zorder=1)
-    for t in quads:
-        xv = float(np.clip(t.vertex, -1.9, 5.6))
-        ax.plot([xv], [t.discriminant], "o", color=C_DECOY, ms=8, zorder=4)
-        ax.annotate(t.name, (xv, t.discriminant), fontsize=8.4,
-                    family=MONO, xytext=(8, 4), textcoords="offset points")
-    ax.set_xlim(-2.1, 6.2)
-    ax.set_ylim(-9.5, 16)
-    ax.set_xlabel("vertex $x_v=-c_1/2c_2$", fontsize=9)
-    ax.set_ylabel(r"discriminant $\mathrm{disc}=c_1^2-4c_0c_2$", fontsize=9)
+def _plot_target(ax, tgt, col):
+    """One target's curve, sampled points, roots and vertex, on its own axes."""
+    xs = np.linspace(tgt.x_min, tgt.x_max, 400)
+    ys = tgt.ys(xs)
+    ax.plot(xs, ys, color=col, lw=2.0)
+    ax.plot(tgt.xs(), tgt.ys(tgt.xs()), ".", color=col, ms=2.6, alpha=0.55)
+    ax.axhline(0, color="0.75", lw=0.8, zorder=1)
+    for r in tgt.roots_in_domain():
+        ax.plot([r], [0], "o", color=C_TGT, ms=5.0, zorder=5)
+    if tgt.vertex_in_domain():
+        xv = tgt.vertex
+        ax.plot([xv], [tgt.ys(np.array([xv]))[0]], "^", color=C_OK,
+                ms=7.0, zorder=5)
+    ax.set_xlim(tgt.x_min, tgt.x_max)
+    ax.set_xticks([-1, 0, 1])
     ax.tick_params(labelsize=8)
-    ax.text(0.0, 15.0, "domain", fontsize=8, color=C_CONT, ha="center")
-    ax.text(6.0, 1.0, r"$\mathrm{disc}>0$: two zeros", fontsize=8, color="#666666",
-            ha="right", va="bottom")
-    ax.text(6.0, -1.0, r"$\mathrm{disc}<0$: none", fontsize=8, color="#666666",
-            ha="right", va="top")
-    ax.set_title("quadratic family: two invariants", fontsize=9.5, pad=5)
+    ax.set_title(tgt.name, fontsize=9.4, family=MONO, pad=18, color=col)
+    ax.text(0.5, 1.035, pretty(tgt.coeffs), transform=ax.transAxes,
+            fontsize=9.0, ha="center", va="bottom")
+    lo, hi = float(ys.min()), float(ys.max())
+    ax.text(0.03, 0.94, f"spread $\\Delta y = {hi - lo:.3g}$",
+            transform=ax.transAxes, fontsize=7.8, color="#666666", va="top")
 
-    # -- the invariant line: linears ------------------------------------
-    ax = fig.add_subplot(gs[1, 5])
-    lins = [t for t in TARGETS.values() if t.family == "linear"]
+
+def fig_family_linear(fam: Family, out="family_targets_linear.png"):
+    lins = family_targets("linear")
+    fig = plt.figure(figsize=(13.2, 3.4))
+    gs = GridSpec(1, 6, width_ratios=[1, 1, 1, 1, 0.18, 1.55], wspace=0.36,
+                  left=0.045, right=0.985, top=0.76, bottom=0.20)
+
+    for k, tgt in enumerate(lins):
+        _plot_target(fig.add_subplot(gs[0, k]), tgt, C_CONT)
+
+    # -- the invariant line: where the zero falls ---------------------------
+    ax = fig.add_subplot(gs[0, 5])
     ax.axvspan(-1, 1, color=C_CONT_BG, zorder=0)
     ax.axvline(-1, color=C_CONT, lw=0.9, ls=":", zorder=1)
     ax.axvline(1, color=C_CONT, lw=0.9, ls=":", zorder=1)
@@ -344,12 +388,55 @@ def fig_family(fam: Family, out="family_targets.png"):
     ax.set_yticks([])
     ax.set_xlabel("zero $-c_0/c_1$", fontsize=9)
     ax.tick_params(labelsize=8)
-    ax.set_title("linear family: the only invariant", fontsize=9.5, pad=5)
+    ax.set_title("the only invariant: where the zero falls", fontsize=9.5,
+                 pad=5)
 
-    fig.text(0.045, 0.028,
+    fig.text(0.045, 0.03,
              "each panel: the target on its own $y$-scale, sampled at the "
-             "$n=41$ grid points;   $\\bullet$ zero inside the domain,   "
-             "$\\blacktriangle$ vertex inside the domain",
+             "$n=41$ grid points;   $\\bullet$ zero inside the domain",
+             fontsize=8.8, color="#555555")
+
+    fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print("wrote", out)
+
+
+def fig_family_quadratic(fam: Family, out="family_targets_quadratic.png"):
+    quads = family_targets("quadratic")
+    fig = plt.figure(figsize=(13.2, 3.4))
+    gs = GridSpec(1, 6, width_ratios=[1, 1, 1, 1, 0.18, 1.55], wspace=0.36,
+                  left=0.045, right=0.985, top=0.76, bottom=0.20)
+
+    for k, tgt in enumerate(quads):
+        _plot_target(fig.add_subplot(gs[0, k]), tgt, C_DECOY)
+
+    # -- the invariant plane: vertex against discriminant --------------------
+    ax = fig.add_subplot(gs[0, 5])
+    ax.axvspan(-1, 1, color=C_CONT_BG, zorder=0)
+    ax.axhline(0, color="0.55", lw=1.0, zorder=1)
+    ax.axvline(-1, color=C_CONT, lw=0.9, ls=":", zorder=1)
+    ax.axvline(1, color=C_CONT, lw=0.9, ls=":", zorder=1)
+    for t in quads:
+        xv = float(np.clip(t.vertex, -1.9, 5.6))
+        ax.plot([xv], [t.discriminant], "o", color=C_DECOY, ms=8, zorder=4)
+        ax.annotate(t.name, (xv, t.discriminant), fontsize=8.4,
+                    family=MONO, xytext=(8, 4), textcoords="offset points")
+    ax.set_xlim(-2.1, 6.2)
+    ax.set_ylim(-9.5, 16)
+    ax.set_xlabel("vertex $x_v=-c_1/2c_2$", fontsize=9)
+    ax.set_ylabel(r"discriminant $\mathrm{disc}=c_1^2-4c_0c_2$", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.text(0.0, 15.0, "domain", fontsize=8, color=C_CONT, ha="center")
+    ax.text(6.0, 1.0, r"$\mathrm{disc}>0$: two zeros", fontsize=8,
+            color="#666666", ha="right", va="bottom")
+    ax.text(6.0, -1.0, r"$\mathrm{disc}<0$: none", fontsize=8, color="#666666",
+            ha="right", va="top")
+    ax.set_title("two invariants: vertex and discriminant", fontsize=9.5,
+                 pad=5)
+
+    fig.text(0.045, 0.03,
+             "each panel: the target on its own $y$-scale, sampled at the "
+             "$n=41$ grid points;   $\\blacktriangle$ vertex inside the domain",
              fontsize=8.8, color="#555555")
 
     fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
@@ -358,17 +445,13 @@ def fig_family(fam: Family, out="family_targets.png"):
 
 
 # ===========================================================================
-# FIGURE -- family_difficulty.png : where the difficulty is
+# FIGURES -- family_ceiling.png, family_children.png, family_rarity.png
 # ===========================================================================
-def fig_difficulty(fam: Family, out="family_difficulty.png"):
+def fig_ceiling(fam: Family, out="family_ceiling.png"):
+    """Best reachable R^2 as a function of terminal length, per target."""
     names = list(TARGETS)
-    fig = plt.figure(figsize=(13.2, 7.4))
-    gs = GridSpec(2, 2, width_ratios=[1.15, 1.0], height_ratios=[1.0, 1.15],
-                  wspace=0.22, hspace=0.42,
-                  left=0.055, right=0.985, top=0.92, bottom=0.075)
+    fig, ax = plt.subplots(figsize=(7.2, 4.8))
 
-    # -- (a) reward ceiling against expression length -----------------------
-    ax = fig.add_subplot(gs[0, 0])
     for name in names:
         st = fam.stats[name]
         ks = sorted(st["best_len"])
@@ -400,42 +483,19 @@ def fig_difficulty(fam: Family, out="family_difficulty.png"):
     ax.set_ylabel("best reachable $R^2$", fontsize=9.5)
     ax.set_ylim(-0.06, 1.06)
     ax.tick_params(labelsize=8.5)
-    ax.set_title("(a)  the reward ceiling is bought by length", fontsize=10,
+    ax.set_title("the reward ceiling is bought by length", fontsize=10.5,
                  loc="left")
 
-    # -- (c) deception / rarity plane ---------------------------------------
-    ax = fig.add_subplot(gs[0, 1])
-    ax.axvspan(0, 0.75, color=C_DECOY_BG, zorder=0)
-    ax.axvline(0, color=C_DECOY, lw=1.0, zorder=1)
-    off = {"lin_D": (-10, 10), "quad_C": (8, -3), "lin_B": (8, -3)}
-    for name in names:
-        st = fam.stats[name]
-        x, y = st["margin"], st["rhoC"]
-        col = C_OK if st["solved"] else (C_DECOY if st["trap"] else C_CONT)
-        ax.plot([x], [y], "o", ms=9, color=col, zorder=4)
-        ax.annotate(name, (x, y), fontsize=8.6, family=MONO, color=col,
-                    xytext=off.get(name, (8, -3)), textcoords="offset points")
-    ax.legend(handles=[
-        plt.Line2D([], [], marker="o", ls="", color=C_DECOY,
-                   label="trap: $V^q$ prefers a suboptimal terminal"),
-        plt.Line2D([], [], marker="o", ls="", color=C_OK,
-                   label="the one-action terminal is already exact"),
-        plt.Line2D([], [], marker="o", ls="", color=C_CONT,
-                   label="no inversion"),
-    ], loc="lower left", fontsize=8.2, handletextpad=0.4,
-        bbox_to_anchor=(0.0, -0.44), ncol=1)
-    ax.set_xlim(-0.45, 0.75)
-    ax.set_yscale("log")
-    ax.set_ylim(0.055, 1.15)
-    ax.set_xlabel(r"$\max_i R(D_i)-V^q(C)$   (deception margin)", fontsize=9.5)
-    ax.set_ylabel(r"$\rho_0(C)$", fontsize=9.5)
-    ax.tick_params(labelsize=8.5)
-    ax.text(0.73, 0.062, "mean rollout prefers a one-action terminal",
-            fontsize=8.6, color=C_DECOY, ha="right")
-    ax.set_title("(c)  deception against rarity", fontsize=10, loc="left")
+    fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print("wrote", out)
 
-    # -- (b) the four root children, per target -----------------------------
-    ax = fig.add_subplot(gs[1, :])
+
+def fig_children(fam: Family, out="family_children.png"):
+    """The continue branch's [V^q(C), V*(C)] interval against the three
+    one-action decoys D1, D2, D3, one row per target."""
+    names = list(TARGETS)
+    fig, ax = plt.subplots(figsize=(11.5, 5.0))
     ax.set_xlim(-1.08, 1.30)
     ax.set_ylim(-0.6, len(names) - 0.35)
     dec_names = [d for d, _ in fam.stats["lin_A"]["decoys"]]
@@ -463,8 +523,8 @@ def fig_difficulty(fam: Family, out="family_difficulty.png"):
     ax.set_yticks([])
     ax.set_xlabel("reward", fontsize=9.5)
     ax.tick_params(labelsize=8.5)
-    ax.set_title("(b)  the four children of $s_0$: three terminate at once, "
-                 "one continues", fontsize=10, loc="left")
+    ax.set_title("the four children of $s_0$: three terminate at once, "
+                 "one continues", fontsize=10.5, loc="left")
     handles = [
         plt.Line2D([], [], marker="s", ls="", color=C_DECOY,
                    label=f"$D_1$ = {dec_names[0]}"),
@@ -477,8 +537,47 @@ def fig_difficulty(fam: Family, out="family_difficulty.png"):
                    label="$V^*(C)$"),
     ]
     ax.legend(handles=handles, loc="lower left", ncol=5, fontsize=8.6,
-              bbox_to_anchor=(0.0, -0.30), handletextpad=0.4,
+              bbox_to_anchor=(0.0, -0.24), handletextpad=0.4,
               columnspacing=1.6)
+
+    fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print("wrote", out)
+
+
+def fig_rarity(fam: Family, out="family_rarity.png"):
+    """Deception margin max_i R(D_i) - V^q(C) against exact-completion
+    rarity rho_0(C), per target."""
+    names = list(TARGETS)
+    fig, ax = plt.subplots(figsize=(6.8, 5.2))
+    ax.axvspan(0, 0.75, color=C_DECOY_BG, zorder=0)
+    ax.axvline(0, color=C_DECOY, lw=1.0, zorder=1)
+    off = {"lin_D": (-10, 10), "quad_C": (8, -3), "lin_B": (8, -3)}
+    for name in names:
+        st = fam.stats[name]
+        x, y = st["margin"], st["rhoC"]
+        col = C_OK if st["solved"] else (C_DECOY if st["trap"] else C_CONT)
+        ax.plot([x], [y], "o", ms=9, color=col, zorder=4)
+        ax.annotate(name, (x, y), fontsize=8.6, family=MONO, color=col,
+                    xytext=off.get(name, (8, -3)), textcoords="offset points")
+    ax.legend(handles=[
+        plt.Line2D([], [], marker="o", ls="", color=C_DECOY,
+                   label="trap: $V^q$ prefers a suboptimal terminal"),
+        plt.Line2D([], [], marker="o", ls="", color=C_OK,
+                   label="the one-action terminal is already exact"),
+        plt.Line2D([], [], marker="o", ls="", color=C_CONT,
+                   label="no inversion"),
+    ], loc="lower left", fontsize=8.2, handletextpad=0.4,
+        bbox_to_anchor=(0.0, -0.32), ncol=1)
+    ax.set_xlim(-0.45, 0.75)
+    ax.set_yscale("log")
+    ax.set_ylim(0.055, 1.15)
+    ax.set_xlabel(r"$\max_i R(D_i)-V^q(C)$   (deception margin)", fontsize=9.5)
+    ax.set_ylabel(r"$\rho(C)$   (exact-completion rarity)", fontsize=9.5)
+    ax.tick_params(labelsize=8.5)
+    ax.text(0.73, 0.062, "mean rollout prefers a one-action terminal",
+            fontsize=8.6, color=C_DECOY, ha="right")
+    ax.set_title("deception against rarity", fontsize=10.5, loc="left")
 
     fig.savefig(os.path.join(HERE, out), bbox_inches="tight", facecolor="white")
     plt.close(fig)
@@ -509,5 +608,9 @@ if __name__ == "__main__":
     fam = Family()
     report(fam)
     fig_action_index(fam)
-    fig_family(fam)
-    fig_difficulty(fam)
+    fig_terminal_lengths(fam)
+    fig_family_linear(fam)
+    fig_family_quadratic(fam)
+    fig_ceiling(fam)
+    fig_children(fam)
+    fig_rarity(fam)
