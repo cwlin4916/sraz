@@ -120,7 +120,7 @@ coefficients \(\beta\), fitted by least squares,
 \]
 and is scored by the coefficient of determination of that fit, clipped to
 \([-1,1]\) and written \(R(\pi)\) \eqref{eq:code-reward}.  The clip is
-load-bearing rather than cosmetic: fitting \(\beta x\) to \texttt{lin\_C} of
+necessary, not cosmetic: fitting \(\beta x\) to \texttt{lin\_C} of
 \cref{tab:family} returns \(R^2\approx-2.9\times10^{12}\), and one such
 completion would otherwise decide the mean value of a whole subtree.  The
 inner fit is part of the score, so \(R\) is a function of the structure alone
@@ -299,6 +299,8 @@ values are fitted, and \(C\) for a distinguished \emph{state}.
 \end{tabular}
 \end{center}
 
+\inlinefig{figures/root_children.png}
+
 \noi The reachable states form a directed acyclic graph rather than a tree:
 an action names a buffer position, so expanding the two nonterminals of
 \texttt{+ S S} in either order reaches the same form.  Experiment~1 therefore
@@ -319,9 +321,9 @@ Fix a context-free grammar \(G\) with start symbol \(S\), production set
     \(\lvert s\rvert\le L\), stored as a fixed-length array of \(L\) symbols
     together with \(\lvert s\rvert=\)\,\texttt{real\_state\_len}; cells beyond
     \(\lvert s\rvert\) hold a pad symbol.  The observation space is
-    \(\texttt{MultiDiscrete}([\,\lvert\Sigma\rvert+1\,]^{L})\), so the pad
+   $$ \texttt{MultiDiscrete}([\,\lvert\Sigma\rvert+1\,]^{L})$$, so the pad
     symbol is observable and the agent sees how much buffer
-    remains.\footnote{Load-bearing, not cosmetic: the policy/value net is a
+    remains.\footnote{Necessary, not cosmetic: the policy/value net is a
     fixed-width MLP over a one-hot encoding of the whole buffer, \(L(\lvert
     \Sigma\rvert+1)\) inputs built by \texttt{SymRegPolicyValueNet.\_encode}.
     \texttt{real\_state\_len} is never itself passed to the network, only
@@ -414,6 +416,7 @@ rather than looping.
 A form retains a nonterminal but \(\c{A}(s)=\emptyset\).  Then \texttt{step} is
 never called at all: \texttt{MCTS.\_rollout\_value} breaks out of its loop and
 \emph{discards} the sample rather than scoring it.
+
 \Cref{prop:no-dead-ends} shows this exit cannot fire.
 
 \begin{prop}[Length bound]
@@ -422,15 +425,15 @@ Every reachable form satisfies \(\lvert s\rvert\le L-1\).  In particular every
 terminal expression has at most \(L-1\) symbols.
 \end{prop}
 
-\begin{proof}
-Induction on the number of actions.  \(\lvert s_0\rvert=1\le L-1\).  If \(s'\)
-follows \(s\) by a legal action with production \(w\), the mask condition
-\(\lvert s\rvert+\lvert w\rvert-1<L\) in \eqref{eq:action-mask} states exactly
-that \(\lvert s'\rvert<L\), hence \(\lvert s'\rvert\le L-1\).
-\end{proof}
+% \begin{proof}
+% Induction on the number of actions.  \(\lvert s_0\rvert=1\le L-1\).  If \(s'\)
+% follows \(s\) by a legal action with production \(w\), the mask condition
+% \(\lvert s\rvert+\lvert w\rvert-1<L\) in \eqref{eq:action-mask} states exactly
+% that \(\lvert s'\rvert<L\), hence \(\lvert s'\rvert\le L-1\).
+% \end{proof}
 
-The bound is attained, and the strict inequality in \eqref{eq:action-mask} is
-load-bearing: at \(L=12\) the longest terminals have \(11\) symbols, and the
+The bound is attained, and the strict inequality in \eqref{eq:action-mask}
+matters: at \(L=12\) the longest terminals have \(11\) symbols, and the
 exact expression \texttt{+ C0 + * C1 x * C2 * x x} is admissible so that
 \(V^*(s_0)=1\).  At \(L=11\) it is excluded, and \(V^*(s_0)\) then depends on
 the target: it stays at \(1\) for every linear target, which needs only five
@@ -519,16 +522,12 @@ successor \emph{states} after the production that creates them,
     C=\texttt{+ S S},
     \label{eq:root-decoys}
 \end{equation}
-the same four states already previewed in \cref{subsec:notation}, so that
-\(D_i,C\in\c{S}\) and every value written against them --- \(V^*(C)\),
-\(V^q(C)\), \(\rho(C)\), \(R(D_i)\) --- is the state function of
-\S\ref{subsec:values-failure-modes} evaluated at that state.  Because the four
+the same four states already previewed in \cref{subsec:notation}.  Because the four
 root actions are in bijection with these four children, we also write
 \(N(s_0,C)\) for the visit count of the edge \(s_0\ra C\); no separate symbol
-for a root action is needed.
+for a root action is needed.\\ 
 
-\paragraph{Three of the four are already decided.}
-Three of the four productions carry no nonterminal on the right, so \(D_1\),
+\noi  Three of the four productions carry no nonterminal on the right, so \(D_1\),
 \(D_2\) and \(D_3\) are already terminal: each is a one-symbol derivation with
 \(V^*(D_i)=V^q(D_i)=R(D_i)\), one deterministic number.  The fourth child
 \(C\) is the only one that continues, and the only one whose subtree contains
@@ -580,7 +579,8 @@ alone, separates the two cases.
     \label{tab:family}
 \end{table}
 
-\paragraph{The last term is the expensive one.}
+\hfill \\ 
+
 Panel~(a) plots the reward ceiling: the best \(R^2\) any terminal of \(\ell\)
 symbols attains.  For \texttt{quad\_B} the ceiling is \(0.997213\) already at
 \(\ell=5\), stays there at \(\ell=7\) and \(\ell=9\), and reaches \(1\) only at
