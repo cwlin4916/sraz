@@ -1,0 +1,71 @@
+{
+  "budget": 100,
+  "x": "V_q(C) - max_i V_q(D_i)",
+  "y": "rho(C)",
+  "points": [
+    {
+      "target": "lin_A",
+      "infix": "0.5 + 2.0*x",
+      "family": "linear",
+      "V_q_C": 0.5645558820581685,
+      "V_star_C": 1.0,
+      "rho": 0.39452622653034974,
+      "best_sib": "* C1 x",
+      "best_sib_R": 0.8214285714285714,
+      "best_sib_name": "D2",
+      "difference": -0.25687268937040286,
+      "best_sib_exact": false,
+      "kind": "trap",
+      "fail_B": 1.6200693696917806e-22,
+      "P_B": 1.0
+    },
+    {
+      "target": "lin_B",
+      "infix": "5.0 + 1.0*x",
+      "family": "linear",
+      "V_q_C": 0.13410955986368311,
+      "V_star_C": 1.0,
+      "rho": 0.39452622653034974,
+      "best_sib": "C0",
+      "best_sib_R": 0.0,
+      "best_sib_name": "D1",
+      "difference": 0.13410955986368311,
+      "best_sib_exact": false,
+      "kind": "no inversion",
+      "fail_B": 1.6200693696917806e-22,
+      "P_B": 1.0
+    },
+    {
+      "target": "lin_C",
+      "infix": "1000.0 + 0.001*x",
+      "family": "linear",
+      "V_q_C": 0.1341095598628334,
+      "V_star_C": 1.0,
+      "rho": 0.39452622653034974,
+      "best_sib": "C0",
+      "best_sib_R": 0.0,
+      "best_sib_name": "D1",
+      "difference": 0.1341095598628334,
+      "best_sib_exact": false,
+      "kind": "no inversion",
+      "fail_B": 1.6200693696917806e-22,
+      "P_B": 1.0
+    },
+    {
+      "target": "lin_D",
+      "infix": "0.0 + 2.0*x",
+      "family": "linear",
+      "V_q_C": 0.5924428931970165,
+      "V_star_C": 1.0,
+      "rho": 0.5924428931970165,
+      "best_sib": "* C1 x",
+      "best_sib_R": 1.0,
+      "best_sib_name": "D2",
+      "difference": -0.4075571068029835,
+      "best_sib_exact": true,
+      "kind": "solved at once",
+      "fail_B": 1.044352372607499e-39,
+      "P_B": 1.0
+    }
+  ]
+}

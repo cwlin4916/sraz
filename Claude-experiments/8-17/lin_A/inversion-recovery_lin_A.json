@@ -1,0 +1,49 @@
+{
+  "target": "lin_A",
+  "infix": "0.5 + 2.0*x",
+  "continue_node": {
+    "expr": "+ S S",
+    "V_q": 0.5645558820581685,
+    "V_star": 1.0,
+    "rho": 0.39452622653034974
+  },
+  "siblings": [
+    {
+      "expr": "C0",
+      "name": "D1",
+      "R": 0.0,
+      "V_q": 0.0,
+      "V_star": 0.0
+    },
+    {
+      "expr": "* C1 x",
+      "name": "D2",
+      "R": 0.8214285714285714,
+      "V_q": 0.8214285714285714,
+      "V_star": 0.8214285714285714
+    },
+    {
+      "expr": "* C2 * x x",
+      "name": "D3",
+      "R": -0.07928628162941109,
+      "V_q": -0.07928628162941109,
+      "V_star": -0.07928628162941109
+    }
+  ],
+  "best_sibling": {
+    "expr": "* C1 x",
+    "value": 0.8214285714285714
+  },
+  "difference_under_V_q": -0.25687268937040286,
+  "difference_under_V_star": 0.1785714285714286,
+  "inversion": true,
+  "budget": 100,
+  "p_exact_within_budget": 1.0,
+  "p_failure_within_budget": 1.6200693696917806e-22,
+  "rollouts_for": {
+    "0.5": 2,
+    "0.95": 6,
+    "0.99": 10
+  },
+  "source_tree_json": "Claude-experiments/8-17/lin_A/tree_lin_A_depth2.json"
+}
